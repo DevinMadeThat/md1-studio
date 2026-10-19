@@ -342,7 +342,8 @@ function openViewer(d: Disc, id: string) {
   viewer.index = Math.max(0, viewer.list.findIndex((p) => p.id === id));
   viewer.open = true;
   state.anchor = id;
-  Object.assign(zoom, { z: 1, nx: 0, ny: 0 });
+  // Zoomed-in views start fresh; a smaller-than-fit size is kept from last time.
+  Object.assign(zoom, { z: Math.min(1, prefs.get("viewerScale", 1)), nx: 0, ny: 0 });
   renderViewer(true);
 }
 
@@ -383,9 +384,10 @@ function fact(label: string, value: string) {
 }
 
 function zoomLabel(z: number) {
+  if (z <= 1) prefs.set("viewerScale", Math.round(z * 100) / 100);
   const b = document.getElementById("zoom-badge");
   if (!b) return;
-  b.classList.toggle("show", z > 1.01);
+  b.classList.toggle("show", Math.abs(z - 1) > 0.01);
   b.querySelector("span")!.textContent = `${Math.round(z * 100)}%`;
 }
 
@@ -414,35 +416,14 @@ function renderViewer(navigated: boolean) {
       <button class="v-nav left" data-v="prev" ${viewer.index === 0 ? "disabled" : ""}>${icon.left(26)}</button>
       <div class="v-stage" id="v-stage">
         ${p.jpegPath ? `<img id="v-img" src="${fileUrl(p.jpegPath)}" alt="" draggable="false">` : ""}
-        <div class="zoom-badge" id="zoom-badge"><span>100%</span><button data-v="zoom-reset" title="Fit (0)">Fit</button></div>
+        <div class="zoom-badge" id="zoom-badge" title="Pinch or ⌘+ / ⌘− to zoom · drag to pan · double-click or 0 to fit"><span>100%</span><button data-v="zoom-reset" title="Fit (0)">Fit</button></div>
       </div>
       <button class="v-nav right" data-v="next" ${viewer.index >= viewer.list.length - 1 ? "disabled" : ""}>${icon.right(26)}</button>
       <aside class="v-info">
-        ${p.wavPath ? `
-          <div class="player">
-            <button class="play" data-v="play" title="Play sound (Space)">${icon.play(22)}</button>
-            <div class="wave"><canvas id="wave"></canvas></div>
-            <div class="ptime"><span id="ptime">0:00</span> / ${fmtSecs(p.soundSeconds ?? 0)}</div>
-          </div>` : ""}
-        <div class="toggles">
-          <label class="switch"><input type="checkbox" data-pref="autoplay" ${playback.auto ? "checked" : ""}><i></i> Play sound automatically</label>
-          <label class="switch"><input type="checkbox" data-pref="loop" ${playback.loop ? "checked" : ""}><i></i> ${icon.loop(13)} Loop sound</label>
-        </div>
-
-        <div class="v-section">
-          <div class="v-section-head">${icon.pin(14)} Location
-            <button class="linkish" data-v="edit-location">${loc ? "Change" : "Add"}</button></div>
-          ${loc ? `
-            <div class="map small-map" id="v-map"></div>
-            <div class="v-place">${esc(loc.name || "")}</div>
-            <div class="small muted">${formatLatLon(loc)} · <a href="#" data-v="open-map">Google Maps ${icon.external(11)}</a></div>`
-          : `<div class="muted small">No location yet. Search for a place or paste coordinates.</div>`}
-        </div>
-
-        <div class="v-section">
+        <div class="v-section first">
           <div class="v-section-head">${icon.calendar(14)} Taken
             <button class="linkish" data-v="edit-date">${p.edits.taken ? "Change" : "Set"}</button></div>
-          <div>${takenHtml}</div>
+          <div class="v-taken">${takenHtml}</div>
         </div>
 
         <div class="v-section">
@@ -455,19 +436,44 @@ function renderViewer(navigated: boolean) {
 
         <dl class="facts">
           ${fact("Quality", p.info.quality === "FINE" ? "Fine" : p.info.quality === "STD" ? "Standard" : esc(p.info.quality))}
-          ${fact("Size", `${p.info.width} × ${p.info.height}`)}
           ${fact("Shutter", p.info.shutter ? `${esc(p.info.shutter)} s` : "—")}
           ${fact("Flash", p.info.flash == null ? "—" : p.info.flash ? `${icon.flash(13)} fired` : "off")}
-          ${fact("Sound", p.soundSeconds != null ? `${p.soundSeconds.toFixed(1)} s` : "none")}
           ${fact("File", `${esc(p.stem)}.PMP · ${fmtBytes(p.fileBytes)}`)}
           ${p.protected ? fact("Protected", "yes") : ""}
-          ${!p.inIndex ? fact("Index", `<span class="warn-text">not listed in the album index — the camera won't show it</span>`) : ""}
+          ${!p.inIndex ? fact("Index", `<span class="warn-text">not in the album index — the camera won't show it</span>`) : ""}
         </dl>
         <div class="v-actions">
           <button class="btn" data-v="export">${icon.export(15)} Export…</button>
           <button class="btn" data-v="reveal">${icon.finder(15)} Show file</button>
         </div>
-        <div class="muted small v-keys">Pinch or ⌘+/⌘− to zoom · drag to pan · double-click to zoom · ← → next photo · Space plays sound</div>
+
+        <div class="v-bottom">
+          <div class="v-section">
+            <div class="v-section-head">${icon.pin(14)} Location
+              <button class="linkish" data-v="edit-location">${loc ? "Change" : "Add"}</button></div>
+            ${loc
+              ? `<div class="map small-map" id="v-map"></div>
+                 <div class="v-place" title="${esc(loc.name || "")}">${esc(loc.name || formatLatLon(loc))}</div>
+                 <div class="small muted v-coords">${formatLatLon(loc)} · <a href="#" data-v="open-map">Google Maps ${icon.external(11)}</a></div>`
+              : `<button class="map small-map map-empty" data-v="edit-location">${icon.pin(18)}<span>Add a location</span></button>
+                 <div class="v-place muted">No location</div>
+                 <div class="small muted v-coords">Search a place or paste coordinates</div>`}
+          </div>
+
+          <div class="v-section">
+            <div class="v-section-head">${icon.sound(14)} Sound
+              <span class="v-head-note">${p.soundSeconds != null ? `${p.soundSeconds.toFixed(1)} s` : ""}</span></div>
+            <div class="player ${p.wavPath ? "" : "none"}">
+              <button class="play" data-v="play" title="Play sound (Space)" ${p.wavPath ? "" : "disabled"}>${icon.play(22)}</button>
+              <div class="wave">${p.wavPath ? `<canvas id="wave"></canvas>` : `<span class="muted small">No sound recorded with this photo</span>`}</div>
+              <div class="ptime">${p.wavPath ? `<span id="ptime">0:00</span> / ${fmtSecs(p.soundSeconds ?? 0)}` : "&nbsp;"}</div>
+            </div>
+            <div class="toggles">
+              <label class="switch"><input type="checkbox" data-pref="autoplay" ${playback.auto ? "checked" : ""}><i></i> Play sound automatically</label>
+              <label class="switch"><input type="checkbox" data-pref="loop" ${playback.loop ? "checked" : ""}><i></i> ${icon.loop(13)} Loop sound</label>
+            </div>
+          </div>
+        </div>
       </aside>
     </div>`;
   el.classList.add("show");

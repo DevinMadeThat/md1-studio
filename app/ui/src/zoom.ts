@@ -1,6 +1,6 @@
 // Pinch-zoom and pan for the viewer's photo.
 //
-// Zoom 1 = the photo fitted to the stage. The zoom level and the pan position (as a fraction of
+// Zoom 1 = the photo fitted to the stage; below 1 it is smaller than the stage. The zoom level and the pan position (as a fraction of
 // the photo's size) live in a shared object, so moving to the next photo keeps looking at the
 // same part of the frame at the same magnification.
 
@@ -11,7 +11,8 @@ export interface ZoomShared {
   ny: number;
 }
 
-const MIN = 1;
+/** Below 1 the photo is smaller than the stage; it stays centred. */
+const MIN = 0.2;
 const MAX = 8;
 
 export class ZoomStage {
@@ -49,7 +50,7 @@ export class ZoomStage {
     on("gestureend" as any, (e: any) => { e.preventDefault(); this.inGesture = false; });
     on("mousedown", (e) => this.onDown(e));
     on("dblclick", (e) => {
-      if (this.shared.z > 1.01) this.reset();
+      if (Math.abs(this.shared.z - 1) > 0.01) this.reset();
       else this.zoomTo(2.5, e.clientX, e.clientY);
     });
     const move = (e: MouseEvent) => this.onMove(e);
