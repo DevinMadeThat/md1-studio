@@ -1,0 +1,16 @@
+MD1 Studio — third-party notices
+
+app/crates/atrac1
+  A Rust port of FFmpeg's ATRAC1 decoder (libavcodec/atrac1.c, atrac1data.h, atrac.c).
+    Copyright (c) 2008 Maxim Poliakovski
+    Copyright (c) 2008 Benjamin Larsson
+  FFmpeg is licensed under the GNU Lesser General Public License, version 2.1 or later, and so
+  is this crate (LGPL-2.1-or-later; full text in app/crates/atrac1/LICENSE). The rest of the
+  repository is MIT-licensed. If you distribute MD1 Studio binaries, which link this crate
+  statically, make its source available alongside them (this repository satisfies that).
+
+Rust and npm dependencies are listed in app/Cargo.lock and app/package-lock.json with their
+own licences (MIT / Apache-2.0 for Tauri and the crates used).
+
+Sony, Cyber-shot and MiniDisc are trademarks of Sony Group Corporation. This project is not
+affiliated with or endorsed by Sony. No Sony software or documentation is included.

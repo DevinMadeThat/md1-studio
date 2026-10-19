@@ -1,0 +1,8 @@
+[package]
+name = "atrac1"
+description = "ATRAC1 (MiniDisc) audio decoder, a Rust port of FFmpeg's atrac1 decoder"
+license = "LGPL-2.1-or-later"
+edition.workspace = true
+version.workspace = true
+
+[dependencies]

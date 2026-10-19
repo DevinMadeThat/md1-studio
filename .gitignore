@@ -1,0 +1,42 @@
+# ---- Personal data: never commit ----------------------------------------------
+# Photos, sound and disc mirrors copied off a camera.
+/downloads/
+# Serial traces contain every byte read from the disc (photos, sound). Share traces only after
+# running app/tools/sanitize_trace.py, and put them somewhere deliberate (e.g. a test fixture).
+/md1tool/logs/
+**/serial-*.log
+# Disc folders made by the app or md1tool, wherever they end up.
+**/listing.txt
+**/disc-manifest.txt
+**/disc.json
+*.PMP
+*.PMA
+*.PMX
+*.PMF
+*.wav
+*.aea
+photo-metadata.csv
+
+# ---- Third-party material we may not redistribute -------------------------------
+# Sony's "Digital Still Camera Utility 1.5" CD image and the camera's instruction manual
+# (see docs/references.md for where to find them), saved web pages, and the cheat-sheet
+# diagrams that are drawn on top of the manual's illustrations.
+*.iso
+*.pdf
+/Info/
+/cheatsheet/MD1-diagram-*.png
+
+# ---- Build output / environments -----------------------------------------------
+node_modules/
+/app/dist/
+/app/target/
+/app/src-tauri/gen/
+.venv/
+__pycache__/
+*.pyc
+
+# ---- OS / editor clutter --------------------------------------------------------
+.DS_Store
+.idea/
+.vscode/
+*.swp

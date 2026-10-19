@@ -1,0 +1,2613 @@
+{
+ "meta": {
+  "source": "Sony DSC-MD1 取扱説明書 (3-861-250-02, 1997)",
+  "notes": [
+   "'where' locations are read from the parts drawings (pp.117-118) and are approximate; 'right/left side' = as held by the shooter looking at the LCD.",
+   "Menu footer shows 選択 (turn dial) / 決定 (press dial) / 戻る or 終了 (メニュー button).",
+   "Defaults are given only where the manual shows or implies them.",
+   "Playback-button symbols are written as |◀◀ ▶II ■ ▶▶| (the printed icons)."
+  ]
+ },
+ "body_controls": [
+  {
+   "ja": "電源/充電ランプ",
+   "en": "Power/charge lamp",
+   "where": "right side, top (by power switch)",
+   "note": "Lit when on; orange while charging; off when charge done; blinks slowly during interval shooting"
+  },
+  {
+   "ja": "電源スイッチ",
+   "en": "Power switch",
+   "where": "right side, top",
+   "note": "Push right to turn on/off (p.21). Body label: 電源 / 充電"
+  },
+  {
+   "ja": "プログラムAEダイヤル",
+   "en": "Program AE dial",
+   "where": "right side, top",
+   "note": "Exposure mode (p.34); positions below"
+  },
+  {
+   "ja": "マイク入力/ライン入力切換スイッチ",
+   "en": "Mic in / Line in selector",
+   "where": "right side",
+   "note": "Pick input for audio recording (p.77)"
+  },
+  {
+   "ja": "外部マイク音声/ライン入力端子",
+   "en": "Ext. mic / line-in jack",
+   "where": "right side",
+   "note": "3.5mm; external mic or CD player in (p.77)"
+  },
+  {
+   "ja": "AV出力端子",
+   "en": "AV out jack",
+   "where": "right side",
+   "note": "Video/audio out to TV/video printer (p.76)"
+  },
+  {
+   "ja": "バッテリー解除/ロックスイッチ",
+   "en": "Battery release/lock switch",
+   "where": "right side, lower",
+   "note": "Set to ロック after inserting battery (p.16)"
+  },
+  {
+   "ja": "[ヘッドホン記号]/リモコン端子",
+   "en": "Headphone/remote jack",
+   "where": "right side, lower",
+   "note": "Printed as headphone symbol + /リモコン端子; for supplied remote headphones (p.88)"
+  },
+  {
+   "ja": "スピーカー",
+   "en": "Speaker",
+   "where": "right side, bottom",
+   "note": "Plays narration/audio (p.26)"
+  },
+  {
+   "ja": "ハンドストラップ取り付け部",
+   "en": "Hand strap mount",
+   "where": "top rear corner",
+   "note": ""
+  },
+  {
+   "ja": "フラッシュ発光部",
+   "en": "Flash",
+   "where": "front, top",
+   "note": ""
+  },
+  {
+   "ja": "フラッシュ受光部",
+   "en": "Flash sensor",
+   "where": "front, top",
+   "note": "Don't cover"
+  },
+  {
+   "ja": "レンズ",
+   "en": "Lens",
+   "where": "front, top",
+   "note": "3x zoom"
+  },
+  {
+   "ja": "リモコン受光部",
+   "en": "Remote sensor",
+   "where": "front",
+   "note": "IR receiver for wireless remote"
+  },
+  {
+   "ja": "シャッターボタン",
+   "en": "Shutter button",
+   "where": "front (grip)",
+   "note": "Half-press = AF lock, full press = shoot"
+  },
+  {
+   "ja": "ミニディスクぶた",
+   "en": "MiniDisc lid",
+   "where": "front",
+   "note": "Disc compartment; open with 開くスイッチ"
+  },
+  {
+   "ja": "ミニディスク操作ボタン",
+   "en": "MiniDisc control buttons",
+   "where": "top",
+   "note": "Group of 4 transport buttons below"
+  },
+  {
+   "ja": "■（停止）ボタン",
+   "en": "Stop button",
+   "where": "top",
+   "note": "Stop; also stop before ejecting disc; abort format"
+  },
+  {
+   "ja": "|◀◀（頭出し/早戻し）ボタン",
+   "en": "Prev / rewind button",
+   "where": "top",
+   "note": "Previous image/track; hold = rewind. In level screens: level up (MD rec) / down (BGM rec)"
+  },
+  {
+   "ja": "▶ II（再生/一時停止）ボタン",
+   "en": "Play/pause button",
+   "where": "top",
+   "note": "Play/pause; starts BGM recording"
+  },
+  {
+   "ja": "▶▶|（頭出し/早送り）ボタン",
+   "en": "Next / fast-fwd button",
+   "where": "top",
+   "note": "Next image/track; hold = fast forward"
+  },
+  {
+   "ja": "ホールドスイッチ",
+   "en": "Hold switch",
+   "where": "top",
+   "note": "Slide toward arrow (ホールド) to lock body buttons (p.88)"
+  },
+  {
+   "ja": "録音スイッチ",
+   "en": "Record switch",
+   "where": "top",
+   "note": "Slide to start recording (music MD, BGM, narration) (pp.62, 89)"
+  },
+  {
+   "ja": "©（セルフタイマー）ボタン",
+   "en": "Self-timer button",
+   "where": "top",
+   "note": "10 s self-timer on/off (p.32)"
+  },
+  {
+   "ja": "フラッシュボタン",
+   "en": "Flash button",
+   "where": "top",
+   "note": "Cycles auto / forced / no flash (p.23)"
+  },
+  {
+   "ja": "モードボタン",
+   "en": "Mode button",
+   "where": "top",
+   "note": "Cycles burst modes (camera) / slideshow (playback) (p.29)"
+  },
+  {
+   "ja": "マイク",
+   "en": "Microphone",
+   "where": "back, right edge (top)",
+   "note": "Built-in mic (p.24)"
+  },
+  {
+   "ja": "ズームスイッチ",
+   "en": "Zoom switch",
+   "where": "back, right edge",
+   "note": "T = telephoto, W = wide (p.24)"
+  },
+  {
+   "ja": "ファンクションスイッチ",
+   "en": "Function switch",
+   "where": "back, right edge",
+   "note": "カメラ / 再生/オーディオ (p.95)"
+  },
+  {
+   "ja": "バッテリー端子",
+   "en": "Battery terminal",
+   "where": "back (below LCD)",
+   "note": ""
+  },
+  {
+   "ja": "液晶画面",
+   "en": "LCD screen",
+   "where": "back",
+   "note": "Rotates 180° for self-facing shots"
+  },
+  {
+   "ja": "バッテリー取り付け部",
+   "en": "Battery mount",
+   "where": "back (below LCD)",
+   "note": "p.16"
+  },
+  {
+   "ja": "画面表示ボタン",
+   "en": "Display button",
+   "where": "back (LCD frame)",
+   "note": "Cycles on-screen info; shows battery time (pp.23, 27)"
+  },
+  {
+   "ja": "LCD明るさ+/－ボタン",
+   "en": "LCD brightness +/- buttons",
+   "where": "back (LCD frame)",
+   "note": "p.23"
+  },
+  {
+   "ja": "ナレーションボタン",
+   "en": "Narration button",
+   "where": "left side, top",
+   "note": "Hold to record voice memo onto image (overwrites old narration) (pp.24, 54)"
+  },
+  {
+   "ja": "逆光補正ボタン",
+   "en": "Backlight comp. button",
+   "where": "left side, top",
+   "note": "Hold while shooting to brighten backlit subject (p.40)"
+  },
+  {
+   "ja": "音量+/－ボタン",
+   "en": "Volume +/- buttons",
+   "where": "left side",
+   "note": "p.27"
+  },
+  {
+   "ja": "フォーカスボタン",
+   "en": "Focus button",
+   "where": "left side",
+   "note": "Toggle manual / auto focus (p.39)"
+  },
+  {
+   "ja": "メニューボタン",
+   "en": "Menu button",
+   "where": "left side",
+   "note": "Open/close menu; back one level (p.95)"
+  },
+  {
+   "ja": "削除ボタン",
+   "en": "Delete button",
+   "where": "left side",
+   "note": "Opens delete screens (p.59, music MD p.94)",
+   "danger": true
+  },
+  {
+   "ja": "選択/決定ジョグダイヤル",
+   "en": "Select/Enter jog dial",
+   "where": "left side",
+   "note": "Turn = select, press = enter/toggle (p.95)"
+  },
+  {
+   "ja": "赤外線データ送受信部",
+   "en": "IrDA port",
+   "where": "left side, lower",
+   "note": "IR data to printer/PC/camera (p.76)"
+  },
+  {
+   "ja": "DC IN端子",
+   "en": "DC IN jack",
+   "where": "left side, lower",
+   "note": "AC adaptor / charging (p.17)"
+  },
+  {
+   "ja": "デジタルI/O端子",
+   "en": "Digital I/O jack",
+   "where": "left side, bottom",
+   "note": "Serial cable to PC (IrDA must be OFF) (p.76)"
+  },
+  {
+   "ja": "開くスイッチ",
+   "en": "Open switch",
+   "where": "bottom",
+   "note": "Slide right to open MD lid (p.19)"
+  },
+  {
+   "ja": "三脚用ネジ穴",
+   "en": "Tripod socket",
+   "where": "bottom",
+   "note": "Screw ≤ 5.5mm"
+  },
+  {
+   "ja": "リセットボタン",
+   "en": "Reset button",
+   "where": "bottom",
+   "note": "Press with pointed tool; clears all settings (p.109)",
+   "danger": true
+  },
+  {
+   "ja": "誤消去防止つまみ",
+   "en": "Disc write-protect tab",
+   "where": "on the disc (back)",
+   "note": "Slide open (孔を開く) to protect disc (pp.22, 88)"
+  },
+  {
+   "ja": "ワイヤレスリモコン",
+   "en": "Wireless remote",
+   "where": "accessory",
+   "note": "Range ~5m; needs リモコン ON (p.119)"
+  },
+  {
+   "ja": "リモコン発光部",
+   "en": "Remote IR emitter",
+   "where": "wireless remote",
+   "note": ""
+  },
+  {
+   "ja": "シャッターボタン",
+   "en": "Shutter button",
+   "where": "wireless remote",
+   "note": ""
+  },
+  {
+   "ja": "メニューボタン",
+   "en": "Menu button",
+   "where": "wireless remote",
+   "note": ""
+  },
+  {
+   "ja": "削除ボタン",
+   "en": "Delete button",
+   "where": "wireless remote",
+   "note": "",
+   "danger": true
+  },
+  {
+   "ja": "+/-ボタン/決定ボタン",
+   "en": "+/- buttons / Enter button",
+   "where": "wireless remote",
+   "note": "Same as jog dial: +/- select, 決定 confirm"
+  },
+  {
+   "ja": "|◀◀/▶ II/■/▶▶| ボタン",
+   "en": "Prev / Play-pause / Stop / Next buttons",
+   "where": "wireless remote",
+   "note": ""
+  },
+  {
+   "ja": "画面表示ボタン",
+   "en": "Display button",
+   "where": "wireless remote",
+   "note": ""
+  },
+  {
+   "ja": "ズームスイッチ",
+   "en": "Zoom switch",
+   "where": "wireless remote",
+   "note": ""
+  },
+  {
+   "ja": "リモコン付きヘッドホン",
+   "en": "Headphones with remote",
+   "where": "accessory",
+   "note": "Plug into headphone/remote jack (p.88)"
+  },
+  {
+   "ja": "ヘッドホン",
+   "en": "Headphones",
+   "where": "headphone remote",
+   "note": "Replaceable with other headphones"
+  },
+  {
+   "ja": "VOL（音量）＋/－ボタン",
+   "en": "VOL +/- buttons",
+   "where": "headphone remote",
+   "note": ""
+  },
+  {
+   "ja": "▶（再生）/|◀◀/▶▶|（頭出し、早戻し/早送り）ボタン",
+   "en": "Play / prev-rew / next-ff button",
+   "where": "headphone remote",
+   "note": "Stopped: play; playing: ▶▶| side = next/FF, |◀◀ side = prev/REW"
+  },
+  {
+   "ja": "HOLDスイッチ",
+   "en": "HOLD switch",
+   "where": "headphone remote",
+   "note": "Locks the remote's buttons only"
+  },
+  {
+   "ja": "■（停止）ボタン",
+   "en": "Stop button",
+   "where": "headphone remote",
+   "note": ""
+  },
+  {
+   "ja": "AVLSスイッチ",
+   "en": "AVLS switch (volume limiter)",
+   "where": "headphone remote",
+   "note": "入 = limit volume; screen shows AVLS"
+  },
+  {
+   "ja": "TRACK MARKボタン",
+   "en": "TRACK MARK button",
+   "where": "headphone remote",
+   "note": "Not usable on this unit"
+  },
+  {
+   "ja": "II（一時停止）ボタン",
+   "en": "Pause button",
+   "where": "headphone remote",
+   "note": ""
+  },
+  {
+   "ja": "カメラ",
+   "en": "Camera",
+   "where": "function switch position",
+   "note": "Shooting; menu = 撮影メニュー (p.95)"
+  },
+  {
+   "ja": "再生/オーディオ",
+   "en": "Playback/Audio",
+   "where": "function switch position",
+   "note": "Play MD DATA images (再生メニュー) or music MD (オーディオメニュー)"
+  },
+  {
+   "ja": "•（標準モード）",
+   "en": "Auto (standard)",
+   "where": "program AE dial position",
+   "note": "Full auto; manual settings ignored (p.34)"
+  },
+  {
+   "ja": "A（アイリス優先）",
+   "en": "A: Aperture priority",
+   "where": "program AE dial position",
+   "note": "Uses アイリス setting; aperture shown top-left"
+  },
+  {
+   "ja": "S（シャッター速度優先）",
+   "en": "S: Shutter priority",
+   "where": "program AE dial position",
+   "note": "Uses シャッター速度 setting"
+  },
+  {
+   "ja": "M（マニュアル）",
+   "en": "M: Manual",
+   "where": "program AE dial position",
+   "note": "Uses brightness/shutter/iris settings"
+  },
+  {
+   "ja": "サンセット&ムーンモード",
+   "en": "Sunset & Moon mode",
+   "where": "program AE dial position (icon: sun/moon)",
+   "note": "Sunsets, night scenes, fireworks, neon"
+  },
+  {
+   "ja": "スポットライトモード",
+   "en": "Spotlight mode",
+   "where": "program AE dial position (icon: face in light)",
+   "note": "Stage/wedding: stops faces washing out"
+  },
+  {
+   "ja": "連写",
+   "en": "Burst",
+   "where": "mode button (camera)",
+   "note": "Shots after shutter press; count/interval from 連写設定 (p.29)"
+  },
+  {
+   "ja": "タイムマシン",
+   "en": "Time machine",
+   "where": "mode button (camera)",
+   "note": "Captures frames before AND after press (p.30)"
+  },
+  {
+   "ja": "マルチ画面連写",
+   "en": "Multi-screen burst",
+   "where": "mode button (camera)",
+   "note": "9 frames at 1/15 s in one image (p.31)"
+  },
+  {
+   "ja": "インターバル撮影",
+   "en": "Interval shooting",
+   "where": "mode button (camera)",
+   "note": "2–1000 shots every 20 s–24 h (p.31)"
+  },
+  {
+   "ja": "1枚撮影（マーク表示なし）",
+   "en": "Single shot (no mark)",
+   "where": "mode button (camera)",
+   "note": "Normal shooting"
+  },
+  {
+   "ja": "スライドショー",
+   "en": "Slideshow",
+   "where": "mode button (playback)",
+   "note": "Shows 'スライドショー'; ▶▶| start from first, |◀◀ from last (p.45)"
+  },
+  {
+   "ja": "オートフラッシュ",
+   "en": "Auto flash",
+   "where": "flash button cycle",
+   "note": "Fires automatically when dark"
+  },
+  {
+   "ja": "強制フラッシュ",
+   "en": "Forced flash",
+   "where": "flash button cycle",
+   "note": "Always fires"
+  },
+  {
+   "ja": "フラッシュなし",
+   "en": "No flash",
+   "where": "flash button cycle",
+   "note": ""
+  },
+  {
+   "ja": "マニュアルフォーカス / オートフォーカス",
+   "en": "Manual focus / Autofocus",
+   "where": "focus button toggle",
+   "note": "MF: turn jog dial down = near, up = far (p.39)"
+  },
+  {
+   "ja": "T（望遠）/ W（広角）",
+   "en": "T (tele) / W (wide)",
+   "where": "zoom switch",
+   "note": ""
+  },
+  {
+   "ja": "簡易表示 → 詳細表示 → 表示なし",
+   "en": "Simple → Detailed → No display",
+   "where": "display button (camera)",
+   "note": "p.23"
+  },
+  {
+   "ja": "日時表示 → 詳細表示 → タイトル表示 → 表示なし",
+   "en": "Date → Detailed → Title → No display",
+   "where": "display button (playback)",
+   "note": "p.27"
+  },
+  {
+   "ja": "マイク入力",
+   "en": "Mic input",
+   "where": "mic/line switch position",
+   "note": "Built-in or external mic; mono = 2x record time (p.93)"
+  },
+  {
+   "ja": "ライン入力",
+   "en": "Line input",
+   "where": "mic/line switch position",
+   "note": "CD player etc. for music MD / BGM recording (pp.60, 89)"
+  },
+  {
+   "ja": "解除",
+   "en": "Release",
+   "where": "battery release/lock switch position",
+   "note": "To remove/insert battery"
+  },
+  {
+   "ja": "ロック",
+   "en": "Lock",
+   "where": "battery release/lock switch position",
+   "note": "Yellow mark shows; always use when battery fitted"
+  },
+  {
+   "ja": "ホールド",
+   "en": "Hold",
+   "where": "hold switch position (body)",
+   "note": "Slide toward arrow = buttons disabled; slide back to release"
+  },
+  {
+   "ja": "HOLD",
+   "en": "Hold",
+   "where": "hold switch position (headphone remote)",
+   "note": ""
+  },
+  {
+   "ja": "録音",
+   "en": "Record",
+   "where": "record switch label",
+   "note": "Slide to record"
+  },
+  {
+   "ja": "入",
+   "en": "On",
+   "where": "AVLS switch position",
+   "note": "Limits headphone volume"
+  },
+  {
+   "ja": "切",
+   "en": "Off",
+   "where": "AVLS switch position",
+   "note": "Off position not named in manual (inferred)",
+   "uncertain": true
+  },
+  {
+   "ja": "孔を開く",
+   "en": "Open the hole (protect)",
+   "where": "disc write-protect tab",
+   "note": "Hole open = write-protected; close to record"
+  }
+ ],
+ "menus": [
+  {
+   "mode": "Camera (カメラ)",
+   "menu_ja": "撮影メニュー",
+   "menu_en": "Shooting menu",
+   "how": "Function switch カメラ → メニュー; turn dial to tab, press to enter tab. Footer: 選択 (turn) / 決定 (press) / 戻る or 終了 (メニュー button)",
+   "tabs": [
+    {
+     "ja": "カメラ",
+     "en": "Camera",
+     "items": [
+      {
+       "ja": "明るさ補正",
+       "en": "Brightness (exposure) comp.",
+       "what": "Adjust exposure. Works when AE dial not on • or M. Shown on screen as AE+n.",
+       "options": [
+        {
+         "ja": "-3",
+         "en": "-3"
+        },
+        {
+         "ja": "-2",
+         "en": "-2"
+        },
+        {
+         "ja": "-1",
+         "en": "-1"
+        },
+        {
+         "ja": "標準",
+         "en": "Standard (0)"
+        },
+        {
+         "ja": "+1",
+         "en": "+1"
+        },
+        {
+         "ja": "+2",
+         "en": "+2"
+        },
+        {
+         "ja": "+3",
+         "en": "+3"
+        }
+       ],
+       "default": "標準",
+       "page": 35,
+       "note": "7 steps -3…+3; '標準' is displayed for 0"
+      },
+      {
+       "ja": "シャッター速度",
+       "en": "Shutter speed",
+       "what": "Fixed shutter speed. Works with AE dial on S or M. No flash at ≤1/15 or ≥1/2000.",
+       "options": [
+        {
+         "ja": "1/4～1/15",
+         "en": "1/4–1/15 s: dusk/night"
+        },
+        {
+         "ja": "1/30",
+         "en": "1/30 s: indoors"
+        },
+        {
+         "ja": "1/100",
+         "en": "1/100 s: flickering (fluorescent) light"
+        },
+        {
+         "ja": "1/250～1/4000",
+         "en": "1/250–1/4000 s: fast action"
+        }
+       ],
+       "default": "",
+       "page": 36,
+       "note": "Range 1/4–1/4000. Manual only lists these guide values (screen example: 1/30, 1/100, 1/1000); exact intermediate steps not listed",
+       "uncertain": true
+      },
+      {
+       "ja": "アイリス",
+       "en": "Iris (aperture)",
+       "what": "Fixed aperture. Works with AE dial on A or M.",
+       "options": [
+        {
+         "ja": "F2.1",
+         "en": "f/2.1"
+        },
+        {
+         "ja": "F2.8",
+         "en": "f/2.8"
+        },
+        {
+         "ja": "F4",
+         "en": "f/4"
+        },
+        {
+         "ja": "F5.6",
+         "en": "f/5.6"
+        },
+        {
+         "ja": "F8",
+         "en": "f/8"
+        },
+        {
+         "ja": "F11",
+         "en": "f/11"
+        },
+        {
+         "ja": "F16",
+         "en": "f/16"
+        }
+       ],
+       "default": "",
+       "page": 37
+      },
+      {
+       "ja": "フラッシュ設定",
+       "en": "Flash level",
+       "what": "Flash brightness. Works when AE dial not on •.",
+       "options": [
+        {
+         "ja": "-3",
+         "en": "-3"
+        },
+        {
+         "ja": "-2",
+         "en": "-2"
+        },
+        {
+         "ja": "-1",
+         "en": "-1"
+        },
+        {
+         "ja": "標準",
+         "en": "Standard (0)"
+        },
+        {
+         "ja": "+1",
+         "en": "+1"
+        },
+        {
+         "ja": "+2",
+         "en": "+2"
+        },
+        {
+         "ja": "+3",
+         "en": "+3"
+        }
+       ],
+       "default": "標準",
+       "page": 38,
+       "note": "7 steps -3…+3"
+      }
+     ]
+    },
+    {
+     "ja": "設定",
+     "en": "Settings",
+     "items": [
+      {
+       "ja": "アルバム選択",
+       "en": "Album select",
+       "what": "Choose album that new pictures are saved to.",
+       "options": [
+        {
+         "ja": "01～30（アルバム一覧）",
+         "en": "Album 01–30 (cover thumbnails, 8 per page)"
+        },
+        {
+         "ja": "空のアルバム",
+         "en": "Empty album (pick to create a new album)"
+        }
+       ],
+       "default": "",
+       "page": 64,
+       "note": "Max 30 albums/disc, 1000 images/album; |◀◀/▶▶| pages by 8"
+      },
+      {
+       "ja": "連写設定",
+       "en": "Burst settings",
+       "what": "Count and interval for 連写 and タイムマシン modes. Screen shows e.g. '6枚 0.25秒'.",
+       "options": [
+        {
+         "ja": "枚数: 2枚～10枚",
+         "en": "Count: 2–10 shots"
+        },
+        {
+         "ja": "間隔: 0.25秒",
+         "en": "Interval: 0.25 s"
+        },
+        {
+         "ja": "間隔: 0.5秒",
+         "en": "Interval: 0.5 s"
+        },
+        {
+         "ja": "間隔: 0.75秒",
+         "en": "Interval: 0.75 s"
+        },
+        {
+         "ja": "間隔: 1秒",
+         "en": "Interval: 1 s"
+        }
+       ],
+       "default": "",
+       "page": 65,
+       "note": "Sub-screen fields 枚数 (count) then 間隔 (interval). FINE mode takes fewer shots in time machine (10 → 3 before/2 after)"
+      },
+      {
+       "ja": "インターバル撮影",
+       "en": "Interval shooting settings",
+       "what": "Count and interval for interval mode. Screen shows e.g. '10枚 30秒'.",
+       "options": [
+        {
+         "ja": "枚数: 2枚～1000枚",
+         "en": "Count: 2–1000 shots"
+        },
+        {
+         "ja": "間隔: 20秒～24時間",
+         "en": "Interval: 20 s – 24 h"
+        }
+       ],
+       "default": "",
+       "page": 66,
+       "note": "Sub-screen fields 枚数 then 間隔; interval step sizes not listed",
+       "uncertain": true
+      },
+      {
+       "ja": "画質モード",
+       "en": "Picture quality",
+       "what": "JPEG compression. Press dial to toggle.",
+       "options": [
+        {
+         "ja": "FINE",
+         "en": "Fine (ファイン, 128 KB, ~half the shots)"
+        },
+        {
+         "ja": "STD",
+         "en": "Standard (スタンダード, 64 KB)"
+        }
+       ],
+       "default": "STD",
+       "page": 67,
+       "note": "Diary album mode allows STD only; switch to free mode for FINE. Status shows FIN/STD"
+      },
+      {
+       "ja": "ワイド画面",
+       "en": "Wide screen",
+       "what": "Record for 16:9 wide TV playback.",
+       "options": [
+        {
+         "ja": "ON",
+         "en": "Wide 16:9"
+        },
+        {
+         "ja": "OFF",
+         "en": "Normal TV"
+        }
+       ],
+       "default": "",
+       "page": 68
+      },
+      {
+       "ja": "音声同時記録",
+       "en": "Record sound with shot",
+       "what": "Record ~6 s of audio after each shot.",
+       "options": [
+        {
+         "ja": "ON",
+         "en": "On"
+        },
+        {
+         "ja": "OFF",
+         "en": "Off"
+        }
+       ],
+       "default": "",
+       "page": 33,
+       "note": "Not available in burst modes"
+      },
+      {
+       "ja": "レビュー撮影",
+       "en": "Review (panorama) shooting",
+       "what": "Shoot overlapping frames for later stitching on PC (DSKIT-PC4). Shows last frame + live view at 1/4 size.",
+       "options": [
+        {
+         "ja": "ON",
+         "en": "On"
+        },
+        {
+         "ja": "OFF",
+         "en": "Off"
+        }
+       ],
+       "default": "",
+       "page": 40,
+       "note": "Not with LCD rotated (self-facing)"
+      }
+     ]
+    },
+    {
+     "ja": "準備",
+     "en": "Setup",
+     "items": [
+      {
+       "ja": "フォーマット",
+       "en": "Format disc",
+       "what": "Initialise MD DATA disc (PictureMD). ERASES EVERYTHING.",
+       "options": [
+        {
+         "ja": "クイック",
+         "en": "Quick (~50 s, normal use)"
+        },
+        {
+         "ja": "フル",
+         "en": "Full (~40 min, verify; for disc errors)"
+        },
+        {
+         "ja": "実行",
+         "en": "Execute"
+        },
+        {
+         "ja": "キャンセル",
+         "en": "Cancel"
+        }
+       ],
+       "default": "",
+       "page": 107,
+       "danger": true,
+       "note": "Confirm screen: クイックフォーマットを開始します / 所要時間: 約50秒 / 実行 / キャンセル / 注意 フォーマットするとディスク上のデータがすべて消えます. Stop with メニュー or ■ → 中止 (disc unusable until reformatted). Always formats in ダイアリーモード"
+      },
+      {
+       "ja": "アルバムモード",
+       "en": "Album mode",
+       "what": "How images and audio share the disc. Shows current mode; press to open change dialog.",
+       "options": [
+        {
+         "ja": "ダイアリーモード",
+         "en": "Diary mode (365 STD images + ~40 min audio, fixed split)"
+        },
+        {
+         "ja": "フリーモード",
+         "en": "Free mode (free split; up to 1000/album, 2000/disc; FINE allowed)"
+        },
+        {
+         "ja": "実行",
+         "en": "Execute (change to free)"
+        },
+        {
+         "ja": "キャンセル",
+         "en": "Cancel"
+        }
+       ],
+       "default": "ダイアリーモード",
+       "page": 71,
+       "danger": true,
+       "note": "Dialog: ダイアリーモードからフリーモードへ変更します / 注意 フリーモードからダイアリーモードへの変更はできません (one-way, irreversible)"
+      },
+      {
+       "ja": "操作音",
+       "en": "Beep",
+       "what": "Button beep sound.",
+       "options": [
+        {
+         "ja": "ON",
+         "en": "Beep on"
+        },
+        {
+         "ja": "OFF",
+         "en": "Beep off"
+        }
+       ],
+       "default": "ON",
+       "page": 72,
+       "note": "Default ON implied (manual says beep sounds)",
+       "uncertain": true
+      },
+      {
+       "ja": "パワーセーブ",
+       "en": "Power save",
+       "what": "Auto LCD-off / auto power-off.",
+       "options": [
+        {
+         "ja": "ON",
+         "en": "LCD off after ~30 s idle (~10 s after a shot), power off ~3 min later"
+        },
+        {
+         "ja": "OFF",
+         "en": "Power off after 3 min idle (shooting) / 5 min (playback)"
+        }
+       ],
+       "default": "",
+       "page": 73,
+       "note": "Inactive on AC adaptor"
+      },
+      {
+       "ja": "リモコン",
+       "en": "Remote control",
+       "what": "Accept wireless remote.",
+       "options": [
+        {
+         "ja": "ON",
+         "en": "Remote works"
+        },
+        {
+         "ja": "OFF",
+         "en": "Remote ignored"
+        }
+       ],
+       "default": "ON",
+       "page": 74,
+       "note": "Default ON implied (turn OFF if unused)",
+       "uncertain": true
+      },
+      {
+       "ja": "日時設定",
+       "en": "Date/time set",
+       "what": "Set clock (recorded with shots).",
+       "options": [
+        {
+         "ja": "年",
+         "en": "Year"
+        },
+        {
+         "ja": "月",
+         "en": "Month"
+        },
+        {
+         "ja": "日",
+         "en": "Day"
+        },
+        {
+         "ja": "時",
+         "en": "Hour"
+        },
+        {
+         "ja": "分",
+         "en": "Minute"
+        },
+        {
+         "ja": "AM / PM",
+         "en": "AM / PM"
+        }
+       ],
+       "default": "",
+       "page": 75,
+       "note": "Turn to change, press to go to next field; after 分 clock starts. Shows '--月--日' if unset. AM/PM shown on screen; how it is set not described",
+       "uncertain": true
+      }
+     ]
+    },
+    {
+     "ja": "削除ボタン",
+     "en": "Delete button screens",
+     "items": [
+      {
+       "ja": "削除範囲選択",
+       "en": "Delete: choose range",
+       "what": "Press 削除 in shooting, rec-review or playback.",
+       "options": [
+        {
+         "ja": "この画像",
+         "en": "This image"
+        },
+        {
+         "ja": "選択画像",
+         "en": "Selected images (screen 削除画像選択; press to mark, メニュー to continue)"
+        },
+        {
+         "ja": "アルバム",
+         "en": "Whole current album"
+        },
+        {
+         "ja": "実行",
+         "en": "Execute"
+        },
+        {
+         "ja": "キャンセル",
+         "en": "Cancel"
+        }
+       ],
+       "default": "",
+       "page": 59,
+       "danger": true,
+       "note": "Confirm: 削除しますか？ 実行 / キャンセル → 削除実行中 0001/0012. Sound deleted too. Protected images skipped. Cannot undo"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "mode": "Playback (再生/オーディオ, MD DATA disc)",
+   "menu_ja": "再生メニュー",
+   "menu_en": "Playback menu",
+   "how": "Function switch 再生/オーディオ with MD DATA disc → メニュー. Footer: 選択 (turn) / 決定 (press) / 戻る or 終了 (メニュー button)",
+   "tabs": [
+    {
+     "ja": "再生",
+     "en": "Playback",
+     "items": [
+      {
+       "ja": "インデックス",
+       "en": "Index",
+       "what": "Show 12 thumbnails; select + press = full screen; メニュー = back to index.",
+       "options": [],
+       "default": "",
+       "page": 42,
+       "note": "Marks shown: protect (H), bookmarks. |◀◀/▶▶| page by 12"
+      },
+      {
+       "ja": "拡大",
+       "en": "Zoom (enlarge)",
+       "what": "Show 1/4 of image at 4x; jog dial moves frame; 画面表示 hides frame.",
+       "options": [],
+       "default": "",
+       "page": 47,
+       "note": "No sound playback while enlarged"
+      },
+      {
+       "ja": "アルバム選択",
+       "en": "Album select",
+       "what": "Choose album to play back.",
+       "options": [
+        {
+         "ja": "01～30（アルバム一覧）",
+         "en": "Album 01–30 (cover thumbnails, 8 per page)"
+        },
+        {
+         "ja": "空のアルバム",
+         "en": "Empty album (pick to create a new album)"
+        }
+       ],
+       "default": "",
+       "page": 64,
+       "note": "Max 30 albums/disc, 1000 images/album; |◀◀/▶▶| pages by 8"
+      },
+      {
+       "ja": "検索",
+       "en": "Search",
+       "what": "List images by criterion, then pick one.",
+       "options": [
+        {
+         "ja": "日付",
+         "en": "Date (then 日付検索 list: date + 枚数 count)"
+        },
+        {
+         "ja": "青いしおり",
+         "en": "Blue bookmark"
+        },
+        {
+         "ja": "赤いしおり",
+         "en": "Red bookmark"
+        },
+        {
+         "ja": "プロテクト",
+         "en": "Protected"
+        }
+       ],
+       "default": "",
+       "page": 43,
+       "note": "Result list shows 8 per page"
+      },
+      {
+       "ja": "音声同時再生",
+       "en": "Play sound with image",
+       "what": "Play recorded sound/narration with images.",
+       "options": [
+        {
+         "ja": "ON",
+         "en": "Play sound"
+        },
+        {
+         "ja": "OFF",
+         "en": "Silent"
+        }
+       ],
+       "default": "",
+       "page": 48
+      }
+     ]
+    },
+    {
+     "ja": "設定",
+     "en": "Settings",
+     "items": [
+      {
+       "ja": "プロテクト",
+       "en": "Protect",
+       "what": "Mark images so they can't be deleted/edited. Screen 'プロテクト指定'; press to toggle H mark, メニュー to save.",
+       "options": [
+        {
+         "ja": "H（プロテクトマーク）",
+         "en": "H mark = protected (press again to remove)"
+        }
+       ],
+       "default": "",
+       "page": 58,
+       "note": "Not possible if disc write-protected. Protected images can't be deleted/moved/copied/rotated/titled/narrated"
+      },
+      {
+       "ja": "青いしおり",
+       "en": "Blue bookmark",
+       "what": "Tag images (screen '青いしおり設定'); press to toggle, メニュー to save.",
+       "options": [],
+       "default": "",
+       "page": 57
+      },
+      {
+       "ja": "赤いしおり",
+       "en": "Red bookmark",
+       "what": "Tag images red; same as blue. An image can have both.",
+       "options": [],
+       "default": "",
+       "page": 57
+      },
+      {
+       "ja": "スライドショー",
+       "en": "Slideshow settings",
+       "what": "Repeat, interval and sound for slideshow.",
+       "options": [
+        {
+         "ja": "リピート: ON",
+         "en": "Repeat: on (loop in order)"
+        },
+        {
+         "ja": "リピート: OFF",
+         "en": "Repeat: off (play once, stop)"
+        },
+        {
+         "ja": "リピート: シャッフル",
+         "en": "Repeat: shuffle (loop random)"
+        },
+        {
+         "ja": "間隔設定: 4秒～60秒",
+         "en": "Interval: 4–60 s"
+        },
+        {
+         "ja": "音声選択: ナレーション",
+         "en": "Sound: narration"
+        },
+        {
+         "ja": "音声選択: BGM",
+         "en": "Sound: BGM (then BGM選択 track list)"
+        },
+        {
+         "ja": "音声選択: 音声無し",
+         "en": "Sound: none"
+        }
+       ],
+       "default": "",
+       "page": 69,
+       "note": "Sub-items リピート / 間隔設定 / 音声選択. BGM only selectable if BGM recorded. メニュー x3 to exit"
+      },
+      {
+       "ja": "回転",
+       "en": "Rotate",
+       "what": "Rotate current image 90° per press.",
+       "options": [
+        {
+         "ja": "右回し",
+         "en": "Rotate right (clockwise)"
+        },
+        {
+         "ja": "左回し",
+         "en": "Rotate left (counter-clockwise)"
+        }
+       ],
+       "default": "",
+       "page": 46,
+       "note": "Repeat for 180/270°. Protected images can't be rotated"
+      }
+     ]
+    },
+    {
+     "ja": "編集",
+     "en": "Edit",
+     "items": [
+      {
+       "ja": "移動",
+       "en": "Move images",
+       "what": "Reorder within album or move to another album (with sound).",
+       "options": [
+        {
+         "ja": "アルバム内",
+         "en": "Within album (1 image; insert before chosen image)"
+        },
+        {
+         "ja": "他アルバムへ",
+         "en": "To other album (up to 16; appended at end)"
+        }
+       ],
+       "default": "",
+       "page": 49,
+       "danger": true,
+       "note": "Screens: アルバム内の移動 / 他アルバムへの移動 / 移動する画像を選択してください / 指定した画像の前に挿入します / 移動先のアルバムを選択してください / 移動中. Protected images can't move. メニュー x3 to exit"
+      },
+      {
+       "ja": "コピー",
+       "en": "Copy images",
+       "what": "Copy images (picture only, no sound).",
+       "options": [
+        {
+         "ja": "アルバム内",
+         "en": "Within album (1 image; before chosen image)"
+        },
+        {
+         "ja": "他アルバムへ",
+         "en": "To other album (up to 16; at end)"
+        },
+        {
+         "ja": "他ディスクへ",
+         "en": "To other disc (up to 4; swap discs; target must be formatted)"
+        }
+       ],
+       "default": "",
+       "page": 51,
+       "danger": true,
+       "note": "Screens: アルバム内でのコピー（画像のみ） / 他アルバムへのコピー（画像のみ） / 他ディスクへのコピー（画像のみ） / コピーする画像を選択してください / コピー先のアルバムを選択してください / ディスクを入れ替えてください / 元のディスクを入れてください / コピー中"
+      },
+      {
+       "ja": "BGM録音",
+       "en": "BGM record/erase",
+       "what": "Record background music from line-in for slideshows, or erase it.",
+       "options": [
+        {
+         "ja": "録音",
+         "en": "Record (enter title ≤15 chars, set level, ▶II or record switch to start, ■ to stop)"
+        },
+        {
+         "ja": "消去",
+         "en": "Erase (pick track, 実行/キャンセル)",
+         "danger": true
+        }
+       ],
+       "default": "",
+       "page": 60,
+       "danger": true,
+       "note": "Set mic/line switch to ライン入力. Rec screen: BGMの録音 / 曲名を入力してください / ▶IIで録音を開始します / ■:終了 / |◀◀、▶▶|でレベル調整できます / レベル 標準 / 0db / REC. Erase screen: BGMの消去 / No タイトル / 消去するBGMを選択してください。 / ▶IIキーで再生できます / 消去します / 消去実行中"
+      },
+      {
+       "ja": "タイトル入力",
+       "en": "Title entry",
+       "what": "Name an image or album.",
+       "options": [
+        {
+         "ja": "画像メモ",
+         "en": "Image memo (≤30 chars; shown with 画面表示)"
+        },
+        {
+         "ja": "アルバム",
+         "en": "Album title (≤15 chars; shown in album select)"
+        }
+       ],
+       "default": "",
+       "page": 55,
+       "note": "Character screen 'タイトル：': page 1 = katakana アイウエオ…ン, small ァィゥェォッャュョ, ゛゜, digits 0–9, 終 (end); page 2 = A–Z, a–z, symbols ! \" # $ % & ( ) * + – . ; < = > ? @ _ ' ` , / :. Keep turning dial to change page. |◀◀ moves cursor back to overwrite. メニュー saves. Protected images can't be titled"
+      },
+      {
+       "ja": "プリント",
+       "en": "Print (IrDA printer)",
+       "what": "Print via infrared to DPP-M55 etc. Screen 'プリントメニュー'.",
+       "options": [
+        {
+         "ja": "選択画像",
+         "en": "Selected images (≤16)"
+        },
+        {
+         "ja": "青いしおり",
+         "en": "Blue-bookmarked"
+        },
+        {
+         "ja": "赤いしおり",
+         "en": "Red-bookmarked"
+        },
+        {
+         "ja": "アルバム",
+         "en": "Whole album"
+        },
+        {
+         "ja": "インデックス",
+         "en": "Index print (16 per sheet)"
+        },
+        {
+         "ja": "枚数: 01枚～25枚",
+         "en": "Copies: 1–25"
+        },
+        {
+         "ja": "日付: あり / なし",
+         "en": "Date: print / don't print"
+        },
+        {
+         "ja": "16分割: YES / NO",
+         "en": "16-split print: yes / no"
+        },
+        {
+         "ja": "実行",
+         "en": "Execute"
+        },
+        {
+         "ja": "キャンセル",
+         "en": "Cancel"
+        }
+       ],
+       "default": "",
+       "page": 78,
+       "note": "Exec screen e.g. 選択画像プリント: 実行 / キャンセル / 枚数 01枚 / 日付 あり / 16分割 NO. Progress: プリント中 0004/0012"
+      },
+      {
+       "ja": "画像送受信",
+       "en": "Image send/receive (IrDA)",
+       "what": "Exchange images by infrared with DSC-F3, DPA-1 etc.",
+       "options": [
+        {
+         "ja": "選択画像送信",
+         "en": "Send selected (≤16)"
+        },
+        {
+         "ja": "青いしおり送信",
+         "en": "Send blue-bookmarked"
+        },
+        {
+         "ja": "赤いしおり送信",
+         "en": "Send red-bookmarked"
+        },
+        {
+         "ja": "アルバム送信",
+         "en": "Send album"
+        },
+        {
+         "ja": "受信",
+         "en": "Receive (start sender within 30 s)"
+        },
+        {
+         "ja": "実行",
+         "en": "Execute"
+        },
+        {
+         "ja": "キャンセル",
+         "en": "Cancel"
+        }
+       ],
+       "default": "",
+       "page": 85,
+       "note": "Confirm: 送信実行しますか 実行 / キャンセル. Devices 10–30 cm apart, ±15°"
+      }
+     ]
+    },
+    {
+     "ja": "準備",
+     "en": "Setup",
+     "items": [
+      {
+       "ja": "フォーマット",
+       "en": "Format disc",
+       "what": "Initialise MD DATA disc (PictureMD). ERASES EVERYTHING.",
+       "options": [
+        {
+         "ja": "クイック",
+         "en": "Quick (~50 s, normal use)"
+        },
+        {
+         "ja": "フル",
+         "en": "Full (~40 min, verify; for disc errors)"
+        },
+        {
+         "ja": "実行",
+         "en": "Execute"
+        },
+        {
+         "ja": "キャンセル",
+         "en": "Cancel"
+        }
+       ],
+       "default": "",
+       "page": 107,
+       "danger": true,
+       "note": "Confirm screen: クイックフォーマットを開始します / 所要時間: 約50秒 / 実行 / キャンセル / 注意 フォーマットするとディスク上のデータがすべて消えます. Stop with メニュー or ■ → 中止 (disc unusable until reformatted). Always formats in ダイアリーモード"
+      },
+      {
+       "ja": "IrDA",
+       "en": "IrDA (infrared)",
+       "what": "Choose IR port vs. Digital I/O cable for PC link.",
+       "options": [
+        {
+         "ja": "ON",
+         "en": "Use infrared port"
+        },
+        {
+         "ja": "OFF",
+         "en": "Use Digital I/O cable"
+        }
+       ],
+       "default": "",
+       "page": 82
+      },
+      {
+       "ja": "パワーセーブ",
+       "en": "Power save",
+       "what": "Auto LCD-off / auto power-off.",
+       "options": [
+        {
+         "ja": "ON",
+         "en": "LCD off after ~30 s idle (~10 s after a shot), power off ~3 min later"
+        },
+        {
+         "ja": "OFF",
+         "en": "Power off after 3 min idle (shooting) / 5 min (playback)"
+        }
+       ],
+       "default": "",
+       "page": 73,
+       "note": "Inactive on AC adaptor"
+      },
+      {
+       "ja": "操作音",
+       "en": "Beep",
+       "what": "Button beep sound.",
+       "options": [
+        {
+         "ja": "ON",
+         "en": "Beep on"
+        },
+        {
+         "ja": "OFF",
+         "en": "Beep off"
+        }
+       ],
+       "default": "ON",
+       "page": 72,
+       "note": "Default ON implied (manual says beep sounds)",
+       "uncertain": true
+      },
+      {
+       "ja": "リモコン",
+       "en": "Remote control",
+       "what": "Accept wireless remote.",
+       "options": [
+        {
+         "ja": "ON",
+         "en": "Remote works"
+        },
+        {
+         "ja": "OFF",
+         "en": "Remote ignored"
+        }
+       ],
+       "default": "ON",
+       "page": 74,
+       "note": "Default ON implied (turn OFF if unused)",
+       "uncertain": true
+      },
+      {
+       "ja": "日時設定",
+       "en": "Date/time set",
+       "what": "Set clock (recorded with shots).",
+       "options": [
+        {
+         "ja": "年",
+         "en": "Year"
+        },
+        {
+         "ja": "月",
+         "en": "Month"
+        },
+        {
+         "ja": "日",
+         "en": "Day"
+        },
+        {
+         "ja": "時",
+         "en": "Hour"
+        },
+        {
+         "ja": "分",
+         "en": "Minute"
+        },
+        {
+         "ja": "AM / PM",
+         "en": "AM / PM"
+        }
+       ],
+       "default": "",
+       "page": 75,
+       "note": "Turn to change, press to go to next field; after 分 clock starts. Shows '--月--日' if unset. AM/PM shown on screen; how it is set not described",
+       "uncertain": true
+      }
+     ]
+    },
+    {
+     "ja": "削除ボタン",
+     "en": "Delete button screens",
+     "items": [
+      {
+       "ja": "削除範囲選択",
+       "en": "Delete: choose range",
+       "what": "Press 削除 in shooting, rec-review or playback.",
+       "options": [
+        {
+         "ja": "この画像",
+         "en": "This image"
+        },
+        {
+         "ja": "選択画像",
+         "en": "Selected images (screen 削除画像選択; press to mark, メニュー to continue)"
+        },
+        {
+         "ja": "アルバム",
+         "en": "Whole current album"
+        },
+        {
+         "ja": "実行",
+         "en": "Execute"
+        },
+        {
+         "ja": "キャンセル",
+         "en": "Cancel"
+        }
+       ],
+       "default": "",
+       "page": 59,
+       "danger": true,
+       "note": "Confirm: 削除しますか？ 実行 / キャンセル → 削除実行中 0001/0012. Sound deleted too. Protected images skipped. Cannot undo"
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "mode": "Audio (music MD)",
+   "menu_ja": "オーディオメニュー",
+   "menu_en": "Audio menu",
+   "how": "Function switch 再生/オーディオ with music MD → メニュー. Footer: 選択 (turn) / 決定 (press) / 戻る or 終了 (メニュー button)",
+   "tabs": [
+    {
+     "ja": "オーディオメニュー",
+     "en": "Audio menu (single list, no tabs)",
+     "items": [
+      {
+       "ja": "リピート再生",
+       "en": "Repeat play",
+       "what": "Music MD play mode.",
+       "options": [
+        {
+         "ja": "OFF",
+         "en": "Normal (play once)"
+        },
+        {
+         "ja": "リピート（全曲）",
+         "en": "Repeat all"
+        },
+        {
+         "ja": "リピート（1曲）",
+         "en": "Repeat one"
+        },
+        {
+         "ja": "シャッフル",
+         "en": "Shuffle repeat"
+        }
+       ],
+       "default": "OFF",
+       "page": 90,
+       "note": "Setting it stops current playback; press play to restart"
+      },
+      {
+       "ja": "タイトル入力",
+       "en": "Title entry",
+       "what": "Name disc or a track.",
+       "options": [
+        {
+         "ja": "ディスク",
+         "en": "Disc title"
+        },
+        {
+         "ja": "1:, 2:, …（曲番）",
+         "en": "Track number → track title"
+        }
+       ],
+       "default": "",
+       "page": 91,
+       "note": "≤200 chars. Same character screen as playback (katakana / alphanumerics, 終). ▶▶| / |◀◀ move cursor. Protected MD can't be titled"
+      },
+      {
+       "ja": "日時設定",
+       "en": "Date/time set",
+       "what": "Set clock so recording date is stored. Screen shows e.g. ∫10月28日.",
+       "options": [
+        {
+         "ja": "年",
+         "en": "Year"
+        },
+        {
+         "ja": "月",
+         "en": "Month"
+        },
+        {
+         "ja": "日",
+         "en": "Day"
+        },
+        {
+         "ja": "時",
+         "en": "Hour"
+        },
+        {
+         "ja": "分",
+         "en": "Minute"
+        }
+       ],
+       "default": "",
+       "page": 75
+      }
+     ]
+    },
+    {
+     "ja": "削除ボタン（音楽用ミニディスク）",
+     "en": "Delete button (music MD)",
+     "items": [
+      {
+       "ja": "削除選択",
+       "en": "Delete: choose",
+       "what": "Press 削除 while playing or stopped.",
+       "options": [
+        {
+         "ja": "曲選択",
+         "en": "Select tracks (screen 曲選択消去, ≤16; ▶II to preview)"
+        },
+        {
+         "ja": "ディスク",
+         "en": "Whole disc"
+        },
+        {
+         "ja": "実行",
+         "en": "Execute"
+        },
+        {
+         "ja": "キャンセル",
+         "en": "Cancel"
+        }
+       ],
+       "default": "",
+       "page": 94,
+       "danger": true,
+       "note": "Confirm: 削除しますか？ 実行 / キャンセル. Cannot undo"
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "screen_indicators": [
+  {
+   "ja_or_symbol": "簡易表示",
+   "en": "Simple display (camera)"
+  },
+  {
+   "ja_or_symbol": "詳細表示",
+   "en": "Detailed display"
+  },
+  {
+   "ja_or_symbol": "表示なし",
+   "en": "No display"
+  },
+  {
+   "ja_or_symbol": "日時表示",
+   "en": "Date display (playback)"
+  },
+  {
+   "ja_or_symbol": "タイトル表示",
+   "en": "Title display (playback)"
+  },
+  {
+   "ja_or_symbol": "STD",
+   "en": "Standard quality"
+  },
+  {
+   "ja_or_symbol": "FIN",
+   "en": "Fine quality"
+  },
+  {
+   "ja_or_symbol": "♪（音声同時録音/再生マーク）",
+   "en": "Sound recorded with image / sound playback on"
+  },
+  {
+   "ja_or_symbol": "156枚",
+   "en": "Images taken in this album"
+  },
+  {
+   "ja_or_symbol": "126分 + battery icon",
+   "en": "Battery time left (minutes)"
+  },
+  {
+   "ja_or_symbol": "battery icon blinking",
+   "en": "Battery low – 'バッテリーを交換して下さい'"
+  },
+  {
+   "ja_or_symbol": "アルバム12",
+   "en": "Album number"
+  },
+  {
+   "ja_or_symbol": "ダイアリーモード / フリーモード",
+   "en": "Album mode: diary / free"
+  },
+  {
+   "ja_or_symbol": "画像: 1028枚",
+   "en": "Images on disc"
+  },
+  {
+   "ja_or_symbol": "残り: 約820枚",
+   "en": "Remaining shots (approx.)"
+  },
+  {
+   "ja_or_symbol": "ディスク残量",
+   "en": "Disc space meter"
+  },
+  {
+   "ja_or_symbol": "1997.11.23 10:10AM",
+   "en": "Date/time"
+  },
+  {
+   "ja_or_symbol": "12/0065",
+   "en": "Playback no. / total in album"
+  },
+  {
+   "ja_or_symbol": "明るさ（LCD） 暗…明",
+   "en": "LCD brightness bar: dark…bright"
+  },
+  {
+   "ja_or_symbol": "音量 MIN…MAX",
+   "en": "Volume bar"
+  },
+  {
+   "ja_or_symbol": "lightning-bolt icon",
+   "en": "Flash ready (blinking = charging)"
+  },
+  {
+   "ja_or_symbol": "強制フラッシュ icon (bolt)",
+   "en": "Forced flash"
+  },
+  {
+   "ja_or_symbol": "フラッシュなし icon (crossed)",
+   "en": "Flash off"
+  },
+  {
+   "ja_or_symbol": "AFロック表示",
+   "en": "AF lock (half-press)"
+  },
+  {
+   "ja_or_symbol": "MD（赤） MD記録中マーク",
+   "en": "Writing to disc – don't shake/remove power"
+  },
+  {
+   "ja_or_symbol": "T … W",
+   "en": "Zoom position bar"
+  },
+  {
+   "ja_or_symbol": "連写 icon",
+   "en": "Burst mode"
+  },
+  {
+   "ja_or_symbol": "タイムマシン icon",
+   "en": "Time-machine mode"
+  },
+  {
+   "ja_or_symbol": "マルチ画面連写 icon (grid)",
+   "en": "Multi-screen burst"
+  },
+  {
+   "ja_or_symbol": "インターバル撮影 icon (camera+clock)",
+   "en": "Interval mode"
+  },
+  {
+   "ja_or_symbol": "対面撮影マーク (face)",
+   "en": "LCD rotated / self-facing (menus hidden)"
+  },
+  {
+   "ja_or_symbol": "© + □□□□□",
+   "en": "Self-timer; boxes vanish as countdown runs"
+  },
+  {
+   "ja_or_symbol": "AE+3",
+   "en": "Exposure comp. value"
+  },
+  {
+   "ja_or_symbol": "1/1000",
+   "en": "Shutter speed"
+  },
+  {
+   "ja_or_symbol": "F2.1",
+   "en": "Aperture"
+  },
+  {
+   "ja_or_symbol": "Program AE mode icon (top-left)",
+   "en": "Current AE mode (A/S/M/sunset/spotlight)"
+  },
+  {
+   "ja_or_symbol": "マニュアルフォーカスマーク (F in hand)",
+   "en": "Manual focus on"
+  },
+  {
+   "ja_or_symbol": "person icon (近く)",
+   "en": "Focus near (blinks at limit)"
+  },
+  {
+   "ja_or_symbol": "mountain icon (遠く)",
+   "en": "Focus far (blinks at limit)"
+  },
+  {
+   "ja_or_symbol": "音声記録中",
+   "en": "Recording sound with shot"
+  },
+  {
+   "ja_or_symbol": "音声メモ準備中",
+   "en": "Voice memo: getting ready (~1 s)"
+  },
+  {
+   "ja_or_symbol": "音声メモ録音",
+   "en": "Voice memo recording"
+  },
+  {
+   "ja_or_symbol": "H",
+   "en": "Protected image"
+  },
+  {
+   "ja_or_symbol": "しおり mark (blue/red)",
+   "en": "Bookmarked image"
+  },
+  {
+   "ja_or_symbol": "スライドショー",
+   "en": "Slideshow mode active"
+  },
+  {
+   "ja_or_symbol": "拡大位置枠",
+   "en": "Zoom position frame (enlarged playback)"
+  },
+  {
+   "ja_or_symbol": "0001 0002 …",
+   "en": "Image numbers (thumbnail screens)"
+  },
+  {
+   "ja_or_symbol": "Audio MD / AudioMD",
+   "en": "Music MD without disc title"
+  },
+  {
+   "ja_or_symbol": "00:00  残り 21:51",
+   "en": "Elapsed time / remaining time"
+  },
+  {
+   "ja_or_symbol": "AVLS",
+   "en": "Volume limiter active"
+  },
+  {
+   "ja_or_symbol": "REC",
+   "en": "Recording"
+  },
+  {
+   "ja_or_symbol": "レベル 標準 / +3",
+   "en": "Rec level (standard / +3)"
+  },
+  {
+   "ja_or_symbol": "L R",
+   "en": "Left/right level meters"
+  },
+  {
+   "ja_or_symbol": "0db",
+   "en": "Level meter 0 dB mark"
+  },
+  {
+   "ja_or_symbol": "--月--日",
+   "en": "Clock not set"
+  },
+  {
+   "ja_or_symbol": "移動中 / コピー中 / プリント中",
+   "en": "Moving / Copying / Printing (with n/total)"
+  }
+ ],
+ "messages": [
+  {
+   "ja": "新しいディスクです フォーマットしてください",
+   "en": "New disc – please format",
+   "action": "Pick クイックフォーマット (or フル for error disc), press, then 実行. ERASES disc",
+   "danger": true
+  },
+  {
+   "ja": "クイックフォーマット :約50秒 / フルフォーマット :約40分",
+   "en": "Quick format ~50 s / Full format ~40 min",
+   "action": "Choose type (所要時間 = time required)"
+  },
+  {
+   "ja": "クイックフォーマットを開始します 所要時間: 約50秒",
+   "en": "Start quick format? Time: ~50 s",
+   "action": "実行 = go, キャンセル = cancel",
+   "danger": true
+  },
+  {
+   "ja": "注意 フォーマットするとディスク上のデータがすべて消えます",
+   "en": "Caution: formatting erases all data on disc",
+   "action": "Only 実行 if disc is blank/expendable",
+   "danger": true
+  },
+  {
+   "ja": "中止",
+   "en": "Abort (format abort screen)",
+   "action": "Shown after メニュー/■ during format; disc unusable until reformatted"
+  },
+  {
+   "ja": "実用充電終了しました",
+   "en": "Practical charge complete",
+   "action": "Can unplug; 1 more hour = full charge"
+  },
+  {
+   "ja": "バッテリーを交換して下さい / バッテリーを交換してください",
+   "en": "Replace battery",
+   "action": "Battery empty/low (flash disabled) – charge or swap"
+  },
+  {
+   "ja": "バッテリーをチャージして下さい",
+   "en": "Charge the battery",
+   "action": "Power turned off – use AC adaptor or charged battery (risk of data damage)"
+  },
+  {
+   "ja": "このバッテリーは古くなりました。取り換えてください",
+   "en": "This battery is old – replace it",
+   "action": "Buy new battery"
+  },
+  {
+   "ja": "アルバムを作成しますか？",
+   "en": "Create album?",
+   "action": "Disc not PictureMD formatted – choose 実行 to format (erases)",
+   "danger": true
+  },
+  {
+   "ja": "ディスクが壊れています/フォーマットできませんでした ディスクを入れ替えて下さい",
+   "en": "Disc damaged / could not format – change disc",
+   "action": "Insert new recordable MD DATA disc"
+  },
+  {
+   "ja": "ディスクに異常があります",
+   "en": "Disc error",
+   "action": "Reinsert; else try full format (erases) or other disc"
+  },
+  {
+   "ja": "ディスクがいっぱいです",
+   "en": "Disc is full",
+   "action": "Delete images or use new disc (also if burst count > shots left)"
+  },
+  {
+   "ja": "アルバムを変更してください",
+   "en": "Change album",
+   "action": "Album has 1000 images – select another album"
+  },
+  {
+   "ja": "ディスクがプロテクトされています",
+   "en": "Disc is write-protected",
+   "action": "Close the disc's write-protect tab"
+  },
+  {
+   "ja": "Audioミニディスクです",
+   "en": "This is an audio MiniDisc",
+   "action": "Music MD in camera mode – insert MD DATA disc"
+  },
+  {
+   "ja": "このディスクは記録できません",
+   "en": "Cannot record on this disc",
+   "action": "Play-only disc – use recordable disc"
+  },
+  {
+   "ja": "ディスクを修復します / MDの修復中です",
+   "en": "Repairing disc / MD repair in progress",
+   "action": "Wait until done"
+  },
+  {
+   "ja": "画像がありません",
+   "en": "No images",
+   "action": "Nothing recorded yet – shoot first"
+  },
+  {
+   "ja": "画像読み込み中",
+   "en": "Loading images",
+   "action": "Wait (seconds–minutes)"
+  },
+  {
+   "ja": "記録中です お待ち下さい",
+   "en": "Recording – please wait",
+   "action": "Wait for message to clear, then shoot"
+  },
+  {
+   "ja": "最後の画像は記録できませんでした",
+   "en": "Last image could not be recorded",
+   "action": "Power lost – charge battery"
+  },
+  {
+   "ja": "プロテクトされています",
+   "en": "Protected",
+   "action": "Unprotect image before deleting (p.58)"
+  },
+  {
+   "ja": "再生専用ディスクです",
+   "en": "Play-only disc",
+   "action": "Use recordable disc"
+  },
+  {
+   "ja": "プロテクトされた画像が残っています",
+   "en": "Protected images remain",
+   "action": "Protected images not deleted – unprotect first"
+  },
+  {
+   "ja": "表示できません",
+   "en": "Cannot display",
+   "action": "Turn off and retry playback (manual says set function switch to 「切」 – likely means power off)",
+   "uncertain": true
+  },
+  {
+   "ja": "プリントできません",
+   "en": "Cannot print",
+   "action": "Check printer, range (10–30 cm, ±15°), retry"
+  },
+  {
+   "ja": "画像送受信できません",
+   "en": "Cannot send/receive images",
+   "action": "Check other device memory, IR range, retry"
+  },
+  {
+   "ja": "日時をセットしてください",
+   "en": "Please set date/time",
+   "action": "Set clock (日時設定)"
+  },
+  {
+   "ja": "削除しますか？",
+   "en": "Delete?",
+   "action": "実行 = delete (cannot undo), キャンセル = keep",
+   "danger": true
+  },
+  {
+   "ja": "削除実行中",
+   "en": "Deleting…",
+   "action": "Wait"
+  },
+  {
+   "ja": "消去します",
+   "en": "Will erase (BGM)",
+   "action": "実行 / キャンセル",
+   "danger": true
+  },
+  {
+   "ja": "消去実行中",
+   "en": "Erasing…",
+   "action": "Wait"
+  },
+  {
+   "ja": "録音終了しました",
+   "en": "Recording finished (BGM)",
+   "action": "Press メニュー to return"
+  },
+  {
+   "ja": "ダイアリーモードからフリーモードへ変更します",
+   "en": "Change from diary mode to free mode",
+   "action": "実行 = change (one-way), キャンセル = keep",
+   "danger": true
+  },
+  {
+   "ja": "フリーモードからダイアリーモードへの変更はできません",
+   "en": "Cannot change from free mode back to diary mode",
+   "action": "Warning – irreversible"
+  },
+  {
+   "ja": "送信実行しますか",
+   "en": "Send now?",
+   "action": "実行 / キャンセル"
+  },
+  {
+   "ja": "ディスクを入れ替えてください",
+   "en": "Swap discs",
+   "action": "Copy to other disc: insert destination disc"
+  },
+  {
+   "ja": "元のディスクを入れてください",
+   "en": "Insert original disc",
+   "action": "Copy to other disc: re-insert source disc"
+  },
+  {
+   "ja": "移動する画像を選択してください",
+   "en": "Select image(s) to move",
+   "action": "Turn + press, then メニュー"
+  },
+  {
+   "ja": "指定した画像の前に挿入します",
+   "en": "Will insert before chosen image",
+   "action": "Pick insert position"
+  },
+  {
+   "ja": "移動先のアルバムを選択してください",
+   "en": "Select destination album",
+   "action": "Pick album"
+  },
+  {
+   "ja": "コピーする画像を選択してください",
+   "en": "Select image(s) to copy",
+   "action": "Turn + press, then メニュー"
+  },
+  {
+   "ja": "コピー先のアルバムを選択してください",
+   "en": "Select album to copy to",
+   "action": "Pick album"
+  },
+  {
+   "ja": "画像を選択してください",
+   "en": "Select an image",
+   "action": "Turn + press"
+  },
+  {
+   "ja": "曲名を入力してください",
+   "en": "Enter track name",
+   "action": "Use character screen, then メニュー"
+  },
+  {
+   "ja": "▶IIで録音を開始します",
+   "en": "Press ▶II to start recording",
+   "action": "Start BGM recording"
+  },
+  {
+   "ja": "■:終了",
+   "en": "■: finish",
+   "action": "Press ■ to stop/end"
+  },
+  {
+   "ja": "|◀◀、▶▶|でレベル調整できます",
+   "en": "Adjust level with |◀◀ / ▶▶|",
+   "action": "BGM: ▶▶| = up, |◀◀ = down (music MD rec p.89 says the reverse)"
+  },
+  {
+   "ja": "消去するBGMを選択してください。",
+   "en": "Select BGM to erase",
+   "action": "Pick track"
+  },
+  {
+   "ja": "▶IIキーで再生できます",
+   "en": "Press ▶II to preview",
+   "action": "Preview before erasing"
+  }
+ ],
+ "common_words": [
+  {
+   "ja": "選択",
+   "en": "Select (turn dial)"
+  },
+  {
+   "ja": "決定",
+   "en": "Enter/OK (press dial)"
+  },
+  {
+   "ja": "戻る",
+   "en": "Back"
+  },
+  {
+   "ja": "終了",
+   "en": "Exit/Done"
+  },
+  {
+   "ja": "メニュー",
+   "en": "Menu (button)"
+  },
+  {
+   "ja": "実行",
+   "en": "Execute/OK"
+  },
+  {
+   "ja": "キャンセル",
+   "en": "Cancel"
+  },
+  {
+   "ja": "中止",
+   "en": "Abort"
+  },
+  {
+   "ja": "ON",
+   "en": "On"
+  },
+  {
+   "ja": "OFF",
+   "en": "Off"
+  },
+  {
+   "ja": "あり",
+   "en": "Yes / with"
+  },
+  {
+   "ja": "なし",
+   "en": "No / without"
+  },
+  {
+   "ja": "YES",
+   "en": "Yes"
+  },
+  {
+   "ja": "NO",
+   "en": "No"
+  },
+  {
+   "ja": "標準",
+   "en": "Standard / normal (0)"
+  },
+  {
+   "ja": "入",
+   "en": "On"
+  },
+  {
+   "ja": "切",
+   "en": "Off"
+  },
+  {
+   "ja": "撮影メニュー",
+   "en": "Shooting menu"
+  },
+  {
+   "ja": "再生メニュー",
+   "en": "Playback menu"
+  },
+  {
+   "ja": "オーディオメニュー",
+   "en": "Audio menu"
+  },
+  {
+   "ja": "カメラ",
+   "en": "Camera (tab)"
+  },
+  {
+   "ja": "設定",
+   "en": "Settings (tab)"
+  },
+  {
+   "ja": "準備",
+   "en": "Setup (tab)"
+  },
+  {
+   "ja": "再生",
+   "en": "Playback (tab) / play"
+  },
+  {
+   "ja": "編集",
+   "en": "Edit (tab)"
+  },
+  {
+   "ja": "プリントメニュー",
+   "en": "Print menu"
+  },
+  {
+   "ja": "枚",
+   "en": "shots/images (count)"
+  },
+  {
+   "ja": "枚数",
+   "en": "Count / number of shots"
+  },
+  {
+   "ja": "間隔",
+   "en": "Interval"
+  },
+  {
+   "ja": "秒",
+   "en": "seconds"
+  },
+  {
+   "ja": "分",
+   "en": "minutes"
+  },
+  {
+   "ja": "時",
+   "en": "hour"
+  },
+  {
+   "ja": "時間",
+   "en": "hours"
+  },
+  {
+   "ja": "年",
+   "en": "year"
+  },
+  {
+   "ja": "月",
+   "en": "month"
+  },
+  {
+   "ja": "日",
+   "en": "day"
+  },
+  {
+   "ja": "AM / PM",
+   "en": "AM / PM"
+  },
+  {
+   "ja": "約",
+   "en": "approx."
+  },
+  {
+   "ja": "残り",
+   "en": "remaining"
+  },
+  {
+   "ja": "所要時間",
+   "en": "time required"
+  },
+  {
+   "ja": "画像",
+   "en": "image"
+  },
+  {
+   "ja": "アルバム",
+   "en": "album"
+  },
+  {
+   "ja": "空のアルバム",
+   "en": "empty album"
+  },
+  {
+   "ja": "ディスク",
+   "en": "disc"
+  },
+  {
+   "ja": "曲",
+   "en": "track/song"
+  },
+  {
+   "ja": "曲番",
+   "en": "track number"
+  },
+  {
+   "ja": "曲名",
+   "en": "track title"
+  },
+  {
+   "ja": "No",
+   "en": "No. (number)"
+  },
+  {
+   "ja": "タイトル",
+   "en": "title"
+  },
+  {
+   "ja": "タイトル：",
+   "en": "Title: (entry line)"
+  },
+  {
+   "ja": "終",
+   "en": "End (finish text entry)"
+  },
+  {
+   "ja": "1ページ目へ",
+   "en": "to page 1"
+  },
+  {
+   "ja": "2ページ目へ",
+   "en": "to page 2"
+  },
+  {
+   "ja": "次ページへ",
+   "en": "next page"
+  },
+  {
+   "ja": "しおり",
+   "en": "bookmark"
+  },
+  {
+   "ja": "青いしおり",
+   "en": "blue bookmark"
+  },
+  {
+   "ja": "赤いしおり",
+   "en": "red bookmark"
+  },
+  {
+   "ja": "プロテクト",
+   "en": "protect"
+  },
+  {
+   "ja": "プロテクト指定",
+   "en": "protect setting"
+  },
+  {
+   "ja": "日付",
+   "en": "date"
+  },
+  {
+   "ja": "日付検索",
+   "en": "date search"
+  },
+  {
+   "ja": "音声",
+   "en": "sound/audio"
+  },
+  {
+   "ja": "ナレーション",
+   "en": "narration"
+  },
+  {
+   "ja": "BGM",
+   "en": "background music"
+  },
+  {
+   "ja": "録音",
+   "en": "record (audio)"
+  },
+  {
+   "ja": "消去",
+   "en": "erase"
+  },
+  {
+   "ja": "削除",
+   "en": "delete"
+  },
+  {
+   "ja": "移動",
+   "en": "move"
+  },
+  {
+   "ja": "コピー",
+   "en": "copy"
+  },
+  {
+   "ja": "移動中",
+   "en": "moving"
+  },
+  {
+   "ja": "コピー中",
+   "en": "copying"
+  },
+  {
+   "ja": "プリント中",
+   "en": "printing"
+  },
+  {
+   "ja": "実行中",
+   "en": "in progress"
+  },
+  {
+   "ja": "一時停止",
+   "en": "pause"
+  },
+  {
+   "ja": "停止",
+   "en": "stop"
+  },
+  {
+   "ja": "頭出し",
+   "en": "skip to start (track/image)"
+  },
+  {
+   "ja": "早送り",
+   "en": "fast forward"
+  },
+  {
+   "ja": "早戻し",
+   "en": "rewind"
+  },
+  {
+   "ja": "レベル",
+   "en": "level"
+  },
+  {
+   "ja": "リピート",
+   "en": "repeat"
+  },
+  {
+   "ja": "全曲",
+   "en": "all tracks"
+  },
+  {
+   "ja": "1曲",
+   "en": "one track"
+  },
+  {
+   "ja": "シャッフル",
+   "en": "shuffle"
+  },
+  {
+   "ja": "送信",
+   "en": "send"
+  },
+  {
+   "ja": "受信",
+   "en": "receive"
+  },
+  {
+   "ja": "ファイン",
+   "en": "Fine"
+  },
+  {
+   "ja": "スタンダード",
+   "en": "Standard"
+  },
+  {
+   "ja": "ダイアリーモード",
+   "en": "Diary mode"
+  },
+  {
+   "ja": "フリーモード",
+   "en": "Free mode"
+  },
+  {
+   "ja": "クイック",
+   "en": "Quick"
+  },
+  {
+   "ja": "フル",
+   "en": "Full"
+  },
+  {
+   "ja": "注意",
+   "en": "Caution"
+  },
+  {
+   "ja": "16分割",
+   "en": "16-split (16 per sheet)"
+  },
+  {
+   "ja": "インデックス",
+   "en": "index (thumbnails)"
+  }
+ ]
+}
