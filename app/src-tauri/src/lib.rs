@@ -344,8 +344,17 @@ struct ExportSummary {
     folder: String,
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ExportOpts {
+    scale: f64,
+    sound: bool,
+    apply_edits: bool,
+    metadata: bool,
+}
+
 #[tauri::command]
-async fn export_photos(items: Vec<ExportItem>, dest: String, exif: bool) -> CmdResult<ExportSummary> {
+async fn export_photos(items: Vec<ExportItem>, dest: String, options: ExportOpts) -> CmdResult<ExportSummary> {
     tauri::async_runtime::spawn_blocking(move || {
         let mut discs: Vec<Disc> = Vec::new();
         let mut chosen: Vec<(usize, Photo)> = Vec::new();
@@ -362,7 +371,13 @@ async fn export_photos(items: Vec<ExportItem>, dest: String, exif: bool) -> CmdR
             }
         }
         let refs: Vec<(&str, &Photo)> = chosen.iter().map(|(k, p)| (discs[*k].name.as_str(), p)).collect();
-        let r = export::export_photos(&refs, Path::new(&dest), exif).map_err(err)?;
+        let opts = export::ExportOptions {
+            scale: options.scale.clamp(1.0, 4.0),
+            sound: options.sound,
+            apply_edits: options.apply_edits,
+            metadata: options.metadata,
+        };
+        let r = export::export_photos(&refs, Path::new(&dest), &opts).map_err(err)?;
         Ok(ExportSummary { written: r.written.len(), already_there: r.already_there, folder: dest })
     })
     .await
@@ -375,18 +390,65 @@ async fn export_photos(items: Vec<ExportItem>, dest: String, exif: bool) -> CmdR
 #[serde(rename_all = "camelCase")]
 struct PhotoPatch {
     photo_id: String,
+    /// Compute auto-enhance levels for this photo and turn auto-enhance on.
+    #[serde(default)]
+    auto_enhance: bool,
     #[serde(flatten)]
     patch: EditPatch,
 }
 
-/// Apply location / date / rotation edits to photos of one disc; returns the updated disc.
+fn photo_pixels(photo: &Photo) -> Result<image::RgbImage, String> {
+    let pmp = fs::read(&photo.pmp_path).map_err(err)?;
+    md1_core::formats::extract_jpeg(&pmp)
+        .and_then(md1_core::adjust::decode_jpeg)
+        .ok_or_else(|| format!("{}: unreadable photo", photo.stem))
+}
+
+/// Apply edits (location, date, look, favourite, caption…) to photos of one disc; returns the
+/// updated disc.
 #[tauri::command]
 async fn edit_photos(disc_path: String, patches: Vec<PhotoPatch>) -> CmdResult<Disc> {
     tauri::async_runtime::spawn_blocking(move || {
         let dir = PathBuf::from(&disc_path);
-        let list: Vec<(String, EditPatch)> = patches.into_iter().map(|p| (p.photo_id, p.patch)).collect();
+        let disc = library::scan_disc(&dir).ok_or("disc folder not found")?;
+        let mut list = Vec::new();
+        for mut p in patches {
+            if p.auto_enhance {
+                let photo = find_photo(&disc, &p.photo_id).ok_or("photo not found")?;
+                p.patch.set_auto = Some(md1_core::adjust::auto_levels(&photo_pixels(&photo)?));
+            }
+            list.push((p.photo_id, p.patch));
+        }
         edits::apply(&dir, &list)?;
         library::scan_disc(&dir).ok_or_else(|| "disc folder not found".to_string())
+    })
+    .await
+    .map_err(err)?
+}
+
+/// Auto-enhance levels for one photo (the editor previews them before saving).
+#[tauri::command]
+async fn auto_levels(disc_path: String, photo_id: String) -> CmdResult<md1_core::edits::AutoLevels> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let disc = library::scan_disc(Path::new(&disc_path)).ok_or("disc folder not found")?;
+        let photo = find_photo(&disc, &photo_id).ok_or("photo not found")?;
+        Ok(md1_core::adjust::auto_levels(&photo_pixels(&photo)?))
+    })
+    .await
+    .map_err(err)?
+}
+
+/// Bytes of a file inside a library disc (the frontend decodes photos itself for the editor's
+/// live preview; going through IPC avoids cross-origin canvas restrictions).
+#[tauri::command]
+async fn read_disc_file(app: AppHandle, path: String) -> Result<tauri::ipc::Response, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let p = fs::canonicalize(&path).map_err(err)?;
+        let allowed = disc_paths(&app).into_iter().filter_map(|d| fs::canonicalize(d).ok()).any(|d| p.starts_with(d));
+        if !allowed {
+            return Err("not a library file".to_string());
+        }
+        fs::read(&p).map(tauri::ipc::Response::new).map_err(err)
     })
     .await
     .map_err(err)?
@@ -576,6 +638,8 @@ pub fn run() {
             import_disc,
             export_photos,
             edit_photos,
+            auto_levels,
+            read_disc_file,
             geocode,
             reverse_geocode,
             map_tile,

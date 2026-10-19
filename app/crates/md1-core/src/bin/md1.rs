@@ -6,7 +6,8 @@
 //!   md1 import  PORT DISC_DIR [NAME]
 //!   md1 scan    DISC_DIR            (JSON of albums and photos)
 //!   md1 wav     FILE.PMA OUT.wav
-//!   md1 export  DISC_DIR OUT_DIR
+//!   md1 export  DISC_DIR OUT_DIR [SCALE]
+//!   md1 auto    FILE.PMP            (auto-enhance levels as JSON)
 
 use std::path::Path;
 use std::process::ExitCode;
@@ -68,6 +69,11 @@ fn run(args: &[String]) -> Result<(), Error> {
             let d = library::scan_disc(Path::new(arg(2)?)).ok_or_else(|| Error::Protocol("not a disc folder".into()))?;
             println!("{}", serde_json::to_string_pretty(&d).unwrap());
         }
+        "auto" => {
+            let pmp = std::fs::read(arg(2)?)?;
+            let img = formats::extract_jpeg(&pmp).and_then(md1_core::adjust::decode_jpeg).ok_or_else(|| Error::Protocol("no JPEG".into()))?;
+            println!("{}", serde_json::to_string(&md1_core::adjust::auto_levels(&img)).unwrap());
+        }
         "wav" => {
             let s = formats::decode_pma(&std::fs::read(arg(2)?)?);
             std::fs::write(arg(3)?, formats::wav_bytes(&s, atrac1::SAMPLE_RATE))?;
@@ -75,7 +81,8 @@ fn run(args: &[String]) -> Result<(), Error> {
         "export" => {
             let d = library::scan_disc(Path::new(arg(2)?)).ok_or_else(|| Error::Protocol("not a disc folder".into()))?;
             let photos: Vec<(&str, &library::Photo)> = d.albums.iter().flat_map(|a| a.photos.iter()).map(|p| (d.name.as_str(), p)).collect();
-            let r = export::export_photos(&photos, Path::new(arg(3)?), true)?;
+            let scale: f64 = args.get(4).and_then(|s| s.parse().ok()).unwrap_or(1.0);
+            let r = export::export_photos(&photos, Path::new(arg(3)?), &export::ExportOptions { scale, ..Default::default() })?;
             println!("{} files written, {} already there", r.written.len(), r.already_there);
         }
         _ => return Err(Error::Refused("unknown command".into())),

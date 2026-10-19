@@ -1,4 +1,5 @@
-//! User edits to photo metadata: location, date/time and rotation.
+//! User edits to photos: metadata (location, date/time, caption, favourite) and the "look"
+//! (rotation, flip, straighten, crop, colour adjustments, noise cleanup).
 //!
 //! Stored per disc in `<disc>/edits.json`, keyed by photo id ("PIC00001/PSN00018"). The mirrored
 //! camera files are never modified, so the backup stays byte-exact; edits are applied when
@@ -23,6 +24,71 @@ pub struct Location {
     pub name: Option<String>,
 }
 
+/// Crop rectangle, as fractions (0–1) of the rotated / flipped / straightened photo.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct Crop {
+    pub x: f64,
+    pub y: f64,
+    pub w: f64,
+    pub h: f64,
+}
+
+/// Per-channel levels and a midtone gamma chosen by auto-enhance (computed once, from the
+/// original pixels, so the preview and the export apply exactly the same correction).
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct AutoLevels {
+    /// Black point per channel (R, G, B), 0–1.
+    pub lo: [f64; 3],
+    /// White point per channel, 0–1.
+    pub hi: [f64; 3],
+    pub gamma: f64,
+}
+
+/// Colour adjustments. Sliders run from -1 to 1 (0 = unchanged); denoise from 0 to 1.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
+pub struct Adjust {
+    #[serde(default)]
+    pub auto: Option<AutoLevels>,
+    #[serde(default)]
+    pub brightness: f64,
+    #[serde(default)]
+    pub contrast: f64,
+    #[serde(default)]
+    pub warmth: f64,
+    #[serde(default)]
+    pub saturation: f64,
+    #[serde(default)]
+    pub denoise: f64,
+}
+
+impl Adjust {
+    pub fn is_identity(&self) -> bool {
+        self.auto.is_none()
+            && self.brightness == 0.0
+            && self.contrast == 0.0
+            && self.warmth == 0.0
+            && self.saturation == 0.0
+            && self.denoise == 0.0
+    }
+}
+
+/// Everything the photo editor changes, saved together.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Look {
+    #[serde(default)]
+    pub rotation: u16,
+    #[serde(default)]
+    pub flip: bool,
+    /// Degrees, -15…15, positive = clockwise.
+    #[serde(default)]
+    pub straighten: f64,
+    #[serde(default)]
+    pub crop: Option<Crop>,
+    #[serde(default)]
+    pub adjust: Option<Adjust>,
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct PhotoEdits {
@@ -34,15 +100,41 @@ pub struct PhotoEdits {
     /// Clockwise degrees: 0, 90, 180 or 270.
     #[serde(default, skip_serializing_if = "is_zero")]
     pub rotation: u16,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub flip: bool,
+    #[serde(default, skip_serializing_if = "is_zero_f")]
+    pub straighten: f64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub crop: Option<Crop>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub adjust: Option<Adjust>,
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub favorite: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub caption: Option<String>,
 }
 
 fn is_zero(v: &u16) -> bool {
     *v == 0
 }
 
+fn is_zero_f(v: &f64) -> bool {
+    *v == 0.0
+}
+
+fn is_false(v: &bool) -> bool {
+    !*v
+}
+
 impl PhotoEdits {
     pub fn is_empty(&self) -> bool {
-        self.location.is_none() && self.taken.is_none() && self.rotation == 0
+        self.location.is_none() && self.taken.is_none() && !self.has_look() && self.rotation == 0
+            && !self.favorite && self.caption.is_none()
+    }
+
+    /// Edits that need the pixels re-rendered (anything beyond a plain rotation).
+    pub fn has_look(&self) -> bool {
+        self.flip || self.straighten != 0.0 || self.crop.is_some() || self.adjust.is_some_and(|a| !a.is_identity())
     }
 }
 
@@ -58,6 +150,16 @@ pub struct EditPatch {
     pub clear_taken: bool,
     /// Added to the current rotation (e.g. 90 or -90).
     pub rotate_by: Option<i32>,
+    /// Replace rotation, flip, straighten, crop and colour adjustments (from the photo editor).
+    pub set_look: Option<Look>,
+    /// Turn on auto-enhance with these levels (computed by `adjust::auto_levels`), keeping the
+    /// other adjustments.
+    pub set_auto: Option<AutoLevels>,
+    #[serde(default)]
+    pub clear_auto: bool,
+    pub set_favorite: Option<bool>,
+    /// Empty string clears the caption.
+    pub set_caption: Option<String>,
 }
 
 pub type Edits = BTreeMap<String, PhotoEdits>;
@@ -110,6 +212,30 @@ pub fn apply(disc_dir: &Path, patches: &[(String, EditPatch)]) -> Result<Edits, 
         }
         if let Some(r) = p.rotate_by {
             e.rotation = (e.rotation as i32 + r).rem_euclid(360) as u16 / 90 * 90;
+            // Keep a crop on the same part of the picture.
+            if let Some(c) = e.crop {
+                let turns = r.rem_euclid(360) / 90;
+                e.crop = Some((0..turns).fold(c, |c, _| Crop { x: 1.0 - c.y - c.h, y: c.x, w: c.h, h: c.w }));
+            }
+        }
+        if let Some(look) = &p.set_look {
+            e.rotation = (look.rotation as i32).rem_euclid(360) as u16 / 90 * 90;
+            e.flip = look.flip;
+            e.straighten = look.straighten.clamp(-45.0, 45.0);
+            e.crop = look.crop.filter(|c| c.w > 0.0 && c.h > 0.0 && !(c.x == 0.0 && c.y == 0.0 && c.w == 1.0 && c.h == 1.0));
+            e.adjust = look.adjust.filter(|a| !a.is_identity());
+        }
+        if p.set_auto.is_some() || p.clear_auto {
+            let mut a = e.adjust.unwrap_or_default();
+            a.auto = p.set_auto;
+            e.adjust = Some(a).filter(|a| !a.is_identity());
+        }
+        if let Some(f) = p.set_favorite {
+            e.favorite = f;
+        }
+        if let Some(c) = &p.set_caption {
+            let c = c.trim();
+            e.caption = (!c.is_empty()).then(|| c.to_string());
         }
     }
     edits.retain(|_, e| !e.is_empty());

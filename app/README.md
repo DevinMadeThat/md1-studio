@@ -29,11 +29,22 @@ mirrors `md1tool/md1.py`, which was proven on a real camera.
   * **Date & time**: set it for one photo, the same for many, or "keep the time between shots"
     (the earliest gets the date you enter; the rest keep the gaps the camera recorded, which
     still works when the camera's clock battery is dead).
-  * **Rotate** left/right.
+  * **Rotate** left/right, **favourite** (★, F key; filter by favourites), **caption**.
+* **Photo editor** (E in the viewer):
+  * Adjust: **auto-enhance** (per-channel levels that remove half of a colour cast so lamp-lit
+    rooms stay warm, plus a gentle midtone lift), **brightness, contrast, warmth, saturation**,
+    and **noise & blockiness** cleanup (edge-preserving bilateral filter).
+  * Crop & straighten: aspect presets (free, original, square, 4:3, 3:2, 16:9; portrait photos
+    get portrait crops), ±15° straighten (auto-fills, no blank corners), rotate, flip.
+  * Batch: auto-enhance or favourite a whole selection.
+  * The live preview (`ui/src/look.ts`) and the export renderer (`crates/md1-core/src/adjust.rs`)
+    implement the same formulas; `tools/check_look_parity.ts` checks they agree pixel-for-pixel.
   Edits live in `<disc>/edits.json`; the camera files in the backup are never modified.
-* **Export**: selected photos or a whole disc → JPEGs with EXIF (Sony DSC-MD1, shutter, flash,
-  your date (or the camera's when its clock was set), GPS position + place name, orientation)
-  plus a matching `.wav` for photos with sound.
+* **Export**: selected photos or a whole disc, at original size or **2×/3× upscaled**
+  (Lanczos + light sharpening), with or without edits → JPEGs with EXIF (Sony DSC-MD1,
+  shutter, flash, your date (or the camera's when its clock was set), GPS, caption) and XMP
+  (caption, place, ★ favourite as rating 5) that Photos and Lightroom read, plus a matching
+  `.wav` for photos with sound. A rotation-only photo keeps its original JPEG data.
 * **Open old backups**: "Add backup folder…" accepts any `downloads/discN` folder made by
   `md1tool` (full mirrors and the older photo-only `raw/` layout).
 

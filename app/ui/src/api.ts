@@ -1,5 +1,6 @@
 // Types mirror the Rust structs serialized by src-tauri (serde field names kept as-is).
 import { invoke, convertFileSrc } from "@tauri-apps/api/core";
+import type { Adjust, AutoLevels, Crop, Look } from "./look";
 
 export interface PortInfo {
   path: string;
@@ -75,6 +76,12 @@ export interface PhotoEdits {
   taken?: string | null;
   /** clockwise degrees */
   rotation?: number;
+  flip?: boolean;
+  straighten?: number;
+  crop?: Crop | null;
+  adjust?: Adjust | null;
+  favorite?: boolean;
+  caption?: string | null;
 }
 
 export interface EditPatch {
@@ -83,6 +90,20 @@ export interface EditPatch {
   setTaken?: string;
   clearTaken?: boolean;
   rotateBy?: number;
+  setLook?: Look;
+  /** Compute auto-enhance for the photo and turn it on (batch). */
+  autoEnhance?: boolean;
+  clearAuto?: boolean;
+  setFavorite?: boolean;
+  /** "" clears */
+  setCaption?: string;
+}
+
+export interface ExportOptions {
+  scale: number;
+  sound: boolean;
+  applyEdits: boolean;
+  metadata: boolean;
 }
 
 export interface Place {
@@ -163,8 +184,9 @@ export const api = {
   cameraStatus: () => invoke<CameraInfo | null>("camera_status"),
   importDisc: (name: string, into: string | null) => invoke<Disc>("import_disc", { name, into }),
   cancelImport: () => invoke<void>("cancel_import"),
-  exportPhotos: (items: { discPath: string; photoId: string }[], dest: string, exif: boolean) =>
-    invoke<ExportSummary>("export_photos", { items, dest, exif }),
+  exportPhotos: (items: { discPath: string; photoId: string }[], dest: string, options: ExportOptions) =>
+    invoke<ExportSummary>("export_photos", { items, dest, options }),
+  autoLevels: (discPath: string, photoId: string) => invoke<AutoLevels>("auto_levels", { discPath, photoId }),
   editPhotos: (discPath: string, patches: ({ photoId: string } & EditPatch)[]) =>
     invoke<Disc>("edit_photos", { discPath, patches }),
   geocode: (query: string) => invoke<Place[]>("geocode", { query }),

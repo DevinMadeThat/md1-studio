@@ -7,6 +7,7 @@
 //! write commands only after `set_writes_enabled(true)`; `02 10` (format), `02 15` (delete
 //! picture) and a few others are refused unconditionally.
 
+pub mod adjust;
 pub mod camera;
 pub mod dostime;
 pub mod edits;

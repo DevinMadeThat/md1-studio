@@ -3,17 +3,19 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open } from "@tauri-apps/plugin-dialog";
 import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
 import { api, fileUrl, type CameraInfo, type Disc, type ImportEvent, type Photo, type PortInfo, type Settings } from "./api";
-import { effectiveTaken, googleMapsUrl, openDateEditor, openLocationEditor } from "./editors";
+import { effectiveTaken, googleMapsUrl, openDateEditor, openExportSheet, openLocationEditor } from "./editors";
 import { formatLatLon } from "./geo";
 import { icon } from "./icons";
+import { hasLook, renderedUrl } from "./look";
 import { renderMap } from "./map";
+import { PhotoEditor } from "./photoEditor";
 import { esc, prefs, toast } from "./ui";
 import { ZoomStage, type ZoomShared } from "./zoom";
 
 // ---------------------------------------------------------------- state
 
 type View = { kind: "camera" } | { kind: "disc"; path: string };
-type Filter = "all" | "sound" | "fine";
+type Filter = "all" | "favorites" | "sound" | "fine";
 
 interface ImportState {
   running: boolean;
@@ -68,6 +70,7 @@ const currentDisc = () => (state.view.kind === "disc" ? state.discs.find((d) => 
 
 function visiblePhotos(d: Disc): Photo[] {
   const all = d.albums.flatMap((a) => a.photos);
+  if (state.filter === "favorites") return all.filter((p) => p.edits.favorite);
   if (state.filter === "sound") return all.filter((p) => p.soundSeconds != null);
   if (state.filter === "fine") return all.filter((p) => p.info.quality === "FINE");
   return all;
@@ -248,9 +251,15 @@ function renderDisc(d: Disc) {
       .map((p) => {
         const selected = sel.has(p.id);
         return `<div class="tile ${selected ? "selected" : ""}" data-photo="${esc(p.id)}" tabindex="0">
-          ${p.jpegPath ? `<img loading="lazy" src="${fileUrl(p.jpegPath)}" alt="${esc(p.stem)}" class="rot${p.edits.rotation ?? 0}">` : `<div class="noimg">no image</div>`}
+          ${p.jpegPath
+            ? hasLook(p.edits)
+              ? `<img alt="${esc(p.stem)}" data-render="${esc(p.id)}" class="pending">`
+              : `<img loading="lazy" src="${fileUrl(p.jpegPath)}" alt="${esc(p.stem)}" class="rot${p.edits.rotation ?? 0}">`
+            : `<div class="noimg">no image</div>`}
+          ${p.edits.favorite ? `<span class="tile-fav" title="Favourite">★</span>` : ""}
           <button class="tile-check" data-select="${esc(p.id)}" title="Select (shift-click for a range)">${icon.check(13)}</button>
           <div class="tile-badges">
+            ${p.edits.caption ? `<span class="badge plain" title="${esc(p.edits.caption)}">“”</span>` : ""}
             ${p.edits.location ? `<span class="badge plain" title="${esc(p.edits.location.name || formatLatLon(p.edits.location))}">${icon.pin(12)}</span>` : ""}
             ${p.soundSeconds != null ? `<span class="badge sound" title="Has sound (${p.soundSeconds.toFixed(1)} s)">${icon.sound(12)}</span>` : ""}
             ${p.info.quality === "FINE" ? `<span class="badge">FINE</span>` : ""}
@@ -284,7 +293,7 @@ function renderDisc(d: Disc) {
         <span class="tb-sub">${subtitle}</span>
       </div>
       <div class="seg">
-        ${(["all", "sound", "fine"] as Filter[]).map((f) => `<button class="${state.filter === f ? "on" : ""}" data-filter="${f}">${{ all: "All", sound: "Sound", fine: "Fine" }[f]}</button>`).join("")}
+        ${(["all", "favorites", "sound", "fine"] as Filter[]).map((f) => `<button class="${state.filter === f ? "on" : ""}" data-filter="${f}">${{ all: "All", favorites: "★", sound: "Sound", fine: "Fine" }[f]}</button>`).join("")}
       </div>
       <button class="btn icon-btn" data-action="reveal-disc" title="Show in ${state.settings?.platform === "macos" ? "Finder" : "file manager"}">${icon.finder()}</button>
       <button class="btn" data-action="export">${icon.export(15)} ${sel.size ? `Export ${sel.size}` : "Export all"}…</button>
@@ -295,14 +304,17 @@ function renderDisc(d: Disc) {
       <button class="btn small" data-action="sel-date">${icon.calendar(14)} Date &amp; time…</button>
       <button class="btn small icon-btn" data-action="sel-rotate-left" title="Rotate left">${icon.rotateLeft(14)}</button>
       <button class="btn small icon-btn" data-action="sel-rotate-right" title="Rotate right">${icon.rotateRight(14)}</button>
+      <button class="btn small" data-action="sel-favorite" title="Favourite (F)">★ ${[...sel].every((id) => d.albums.some((a) => a.photos.some((p) => p.id === id && p.edits.favorite))) ? "Unfavourite" : "Favourite"}</button>
+      <button class="btn small" data-action="sel-auto" title="Auto-enhance colour and brightness">✨ Auto-enhance</button>
       <span class="spacer"></span>
       <button class="linkish" data-action="select-all">Select all</button>
       <button class="linkish" data-action="clear-selection">Clear</button>
     </div>` : ""}
     <div class="page">
       ${d.kind === "photos" ? `<div class="callout">This backup holds photo files only (it was made before full-disc copies). Put this disc back in the camera and import it to add its sound recordings, thumbnails and shot times.</div>` : ""}
-      ${photos.length ? body : `<div class="empty">No ${state.filter === "sound" ? "photos with sound" : state.filter === "fine" ? "fine-quality photos" : "photos"} on this disc.</div>`}
+      ${photos.length ? body : `<div class="empty">No ${{ all: "photos", favorites: "favourites (press F in the viewer, or ★ in the selection bar)", sound: "photos with sound", fine: "fine-quality photos" }[state.filter]} on this disc.</div>`}
     </div>`;
+  fillRenderedTiles(d);
   if (state.renaming) {
     const inp = $<HTMLInputElement>("#rename");
     inp.focus();
@@ -321,6 +333,15 @@ function renderDisc(d: Disc) {
   }
 }
 
+/** Tiles of edited photos show a rendered preview (generated in the background, cached). */
+function fillRenderedTiles(d: Disc) {
+  document.querySelectorAll<HTMLImageElement>("img[data-render]").forEach((img) => {
+    const p = d.albums.flatMap((a) => a.photos).find((x) => x.id === img.dataset.render);
+    if (!p) return;
+    renderedUrl(p, 480).then((u) => { img.src = u; img.classList.remove("pending"); }, () => { img.src = fileUrl(p.jpegPath!); });
+  });
+}
+
 // ---------------------------------------------------------------- viewer
 
 const viewer = {
@@ -331,6 +352,7 @@ const viewer = {
   audio: null as HTMLAudioElement | null,
   raf: 0,
   stage: null as ZoomStage | null,
+  editor: null as PhotoEditor | null,
 };
 /** Zoom/pan carried from photo to photo while the viewer is open. */
 const zoom: ZoomShared = { z: 1, nx: 0, ny: 0 };
@@ -348,6 +370,11 @@ function openViewer(d: Disc, id: string) {
 }
 
 function closeViewer() {
+  if (viewer.editor) {
+    viewer.editor.destroy();
+    viewer.editor = null;
+    $("#viewer").classList.remove("editing");
+  }
   viewer.open = false;
   stopAudio();
   viewer.stage?.destroy();
@@ -410,12 +437,14 @@ function renderViewer(navigated: boolean) {
     <div class="v-top" data-drag>
       <button class="v-btn" data-v="close" title="Close (Esc)">${icon.close(18)}</button>
       <div class="v-title" data-drag>${esc(d.name)} · ${esc(p.album)} · photo ${p.number + 1}</div>
+      <button class="v-btn fav ${p.edits.favorite ? "on" : ""}" data-v="favorite" title="Favourite (F)">★</button>
+      <button class="btn v-edit" data-v="edit" title="Adjust, crop and straighten (E)">${icon.edit(14)} Edit</button>
       <div class="v-count" data-drag>${viewer.index + 1} / ${viewer.list.length}</div>
     </div>
     <div class="v-body">
       <button class="v-nav left" data-v="prev" ${viewer.index === 0 ? "disabled" : ""}>${icon.left(26)}</button>
       <div class="v-stage" id="v-stage">
-        ${p.jpegPath ? `<img id="v-img" src="${fileUrl(p.jpegPath)}" alt="" draggable="false">` : ""}
+        ${p.jpegPath ? `<img id="v-img" ${hasLook(p.edits) ? "" : `src="${fileUrl(p.jpegPath)}"`} alt="" draggable="false">` : ""}
         <div class="zoom-badge" id="zoom-badge" title="Pinch or ⌘+ / ⌘− to zoom · drag to pan · double-click or 0 to fit"><span>100%</span><button data-v="zoom-reset" title="Fit (0)">Fit</button></div>
       </div>
       <button class="v-nav right" data-v="next" ${viewer.index >= viewer.list.length - 1 ? "disabled" : ""}>${icon.right(26)}</button>
@@ -424,6 +453,10 @@ function renderViewer(navigated: boolean) {
           <div class="v-section-head">${icon.calendar(14)} Taken
             <button class="linkish" data-v="edit-date">${p.edits.taken ? "Change" : "Set"}</button></div>
           <div class="v-taken">${takenHtml}</div>
+        </div>
+
+        <div class="v-section">
+          <textarea class="caption" id="v-caption" rows="2" placeholder="Add a caption…" spellcheck="true">${esc(p.edits.caption ?? "")}</textarea>
         </div>
 
         <div class="v-section">
@@ -477,10 +510,39 @@ function renderViewer(navigated: boolean) {
       </aside>
     </div>`;
   el.classList.add("show");
-  const img = document.getElementById("v-img");
-  if (img) {
+  const img = document.getElementById("v-img") as HTMLImageElement | null;
+  if (img && p.jpegPath && hasLook(p.edits)) {
+    // Edited: show the rendered photo (rotation already applied) once it's ready.
+    renderedUrl(p).then((u) => {
+      if (viewer.list[viewer.index]?.id !== p.id || !document.body.contains(img)) return;
+      img.onload = () => {
+        viewer.stage?.destroy();
+        viewer.stage = new ZoomStage($("#v-stage"), img, img.naturalWidth, img.naturalHeight, 0, zoom, zoomLabel);
+      };
+      img.src = u;
+    });
+  } else if (img) {
     viewer.stage = new ZoomStage($("#v-stage"), img, p.info.width || 640, p.info.height || 480, p.edits.rotation ?? 0, zoom, zoomLabel);
   }
+  const cap = document.getElementById("v-caption") as HTMLTextAreaElement | null;
+  cap?.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); cap.blur(); }
+    if (e.key === "Escape") { e.stopPropagation(); cap.value = p.edits.caption ?? ""; cap.blur(); }
+  });
+  cap?.addEventListener("blur", async () => {
+    const v = cap.value.trim();
+    if (v === (p.edits.caption ?? "")) return;
+    try {
+      const nd = await api.editPhotos(d.path, [{ photoId: p.id, setCaption: v }]);
+      updateDisc(nd);
+      viewer.disc = nd;
+      const id = p.id;
+      viewer.list = visiblePhotos(nd);
+      viewer.index = Math.max(0, viewer.list.findIndex((x) => x.id === id));
+    } catch (e) {
+      toast(`Couldn't save the caption: ${e}`, undefined, "error");
+    }
+  });
   if (loc) renderMap($("#v-map"), loc.lat, loc.lon, 14);
   if (p.wavPath) {
     drawWave(p.wavPath);
@@ -573,6 +635,36 @@ function togglePlay() {
   };
   cancelAnimationFrame(viewer.raf);
   tick();
+}
+
+function openEditor() {
+  const p = viewer.list[viewer.index];
+  if (!p?.jpegPath || !viewer.disc || viewer.editor) return;
+  stopAudio();
+  viewer.stage?.destroy();
+  viewer.stage = null;
+  $("#viewer").classList.add("editing");
+  viewer.editor = new PhotoEditor({
+    stage: $("#v-stage"),
+    panel: $(".v-info"),
+    disc: viewer.disc,
+    photo: p,
+    done: (nd) => {
+      viewer.editor = null;
+      $("#viewer").classList.remove("editing");
+      if (nd) viewerDiscUpdated(nd);
+      else renderViewer(false);
+    },
+  });
+}
+
+async function setFavorite(d: Disc, ids: string[], on: boolean) {
+  try {
+    return await api.editPhotos(d.path, ids.map((photoId) => ({ photoId, setFavorite: on })));
+  } catch (e) {
+    toast(`Couldn't save: ${e}`, undefined, "error");
+    return null;
+  }
 }
 
 async function rotate(d: Disc, ids: string[], by: number) {
@@ -676,10 +768,14 @@ function onImportEvent(ev: ImportEvent) {
 }
 
 async function exportPhotos(d: Disc, ids: string[]) {
-  const dest = await open({ directory: true, title: "Export photos and sound to…" });
+  const photos = d.albums.flatMap((a) => a.photos).filter((p) => ids.includes(p.id));
+  const choice = await openExportSheet(photos);
+  if (!choice) return;
+  const dest = await open({ directory: true, title: "Export photos to…" });
   if (!dest || Array.isArray(dest)) return;
+  toast(`Exporting ${plural(ids.length, "photo")}…`);
   try {
-    const r = await api.exportPhotos(ids.map((photoId) => ({ discPath: d.path, photoId })), dest, true);
+    const r = await api.exportPhotos(ids.map((photoId) => ({ discPath: d.path, photoId })), dest, choice);
     toast(
       r.written ? `Exported ${plural(r.written, "file")}${r.alreadyThere ? ` (${r.alreadyThere} already there)` : ""}.` : "Everything was already exported there.",
       { label: "Show", run: () => revealItemInDir(dest) },
@@ -716,6 +812,13 @@ document.addEventListener("click", async (e) => {
       case "next": go(1); break;
       case "play": togglePlay(); break;
       case "zoom-reset": viewer.stage?.reset(); break;
+      case "edit": openEditor(); break;
+      case "favorite": {
+        if (!vd || !p) break;
+        const nd = await setFavorite(vd, [p.id], !p.edits.favorite);
+        if (nd) viewerDiscUpdated(nd);
+        break;
+      }
       case "export": if (vd && p) exportPhotos(vd, [p.id]); break;
       case "reveal": if (p) revealItemInDir(p.jpegPath ?? p.pmpPath); break;
       case "edit-location": if (vd && p) openLocationEditor(vd, [p], viewerDiscUpdated); break;
@@ -801,6 +904,26 @@ document.addEventListener("click", async (e) => {
     case "clear-selection": state.selection.clear(); render(); break;
     case "sel-location": if (d) openLocationEditor(d, selectedPhotos(d), (nd) => { updateDisc(nd); render(); }); break;
     case "sel-date": if (d) openDateEditor(d, selectedPhotos(d), (nd) => { updateDisc(nd); render(); }); break;
+    case "sel-favorite": {
+      if (!d) break;
+      const chosen = selectedPhotos(d);
+      const nd = await setFavorite(d, chosen.map((p) => p.id), !chosen.every((p) => p.edits.favorite));
+      if (nd) { updateDisc(nd); render(); }
+      break;
+    }
+    case "sel-auto": {
+      if (!d) break;
+      toast(`Auto-enhancing ${plural(state.selection.size, "photo")}…`);
+      try {
+        const nd = await api.editPhotos(d.path, [...state.selection].map((photoId) => ({ photoId, autoEnhance: true })));
+        updateDisc(nd);
+        render();
+        toast(`Auto-enhanced ${plural(state.selection.size, "photo")}. Open one and press Edit to fine-tune or turn it off.`);
+      } catch (e) {
+        toast(`Auto-enhance failed: ${e}`, undefined, "error");
+      }
+      break;
+    }
     case "sel-rotate-left":
     case "sel-rotate-right": {
       if (!d) break;
@@ -859,6 +982,12 @@ document.addEventListener("keydown", (e) => {
     }
     return;
   }
+  if (viewer.editor) {
+    if (typing) return;
+    if (e.key === "Escape") viewer.editor.cancel();
+    else if (e.key === "Enter") viewer.editor.save();
+    return;
+  }
   if (typing) return;
   const z = viewer.stage;
   if (e.key === "Escape") closeViewer();
@@ -868,6 +997,8 @@ document.addEventListener("keydown", (e) => {
   else if (e.key === "+" || e.key === "=") { e.preventDefault(); z?.zoomBy(1.25); }
   else if (e.key === "-") { e.preventDefault(); z?.zoomBy(0.8); }
   else if (e.key === "0") { e.preventDefault(); z?.reset(); }
+  else if (e.key === "e" || e.key === "E") { e.preventDefault(); openEditor(); }
+  else if (e.key === "f" || e.key === "F") document.querySelector<HTMLButtonElement>('[data-v="favorite"]')?.click();
   else if (e.key === "[" || e.key === "]") document.querySelector<HTMLButtonElement>(`[data-v="${e.key === "[" ? "rotate-left" : "rotate-right"}"]`)?.click();
 });
 

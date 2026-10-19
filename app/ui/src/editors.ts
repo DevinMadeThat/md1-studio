@@ -229,3 +229,55 @@ export function openDateEditor(disc: Disc, photos: Photo[], onSaved: (d: Disc) =
   preview();
   input.focus();
 }
+
+// ------------------------------------------------------------------ export
+
+export interface ExportChoice {
+  scale: number;
+  sound: boolean;
+  applyEdits: boolean;
+  metadata: boolean;
+}
+
+/** Ask how to export; resolves with the choice (remembered for next time) or null. */
+export function openExportSheet(photos: Photo[]): Promise<ExportChoice | null> {
+  const saved = prefs.get<ExportChoice>("export", { scale: 1, sound: true, applyEdits: true, metadata: true });
+  const anySound = photos.some((p) => p.wavPath);
+  const anyEdits = photos.some((p) => Object.keys(p.edits).length);
+  return new Promise((resolve) => {
+    let result: ExportChoice | null = null;
+    const m = openModal(
+      `Export ${label(photos)}`,
+      `<div class="ed-group">Size</div>
+       <div class="ex-sizes">
+         ${[1, 2, 3].map((s) => `
+           <label class="ex-size"><input type="radio" name="scale" value="${s}" ${saved.scale === s ? "checked" : ""}>
+             <b>${s === 1 ? "Original" : `${s}× larger`}</b><span class="muted small">${640 * s} × ${480 * s}${s > 1 ? " · smooth upscale" : ""}</span></label>`).join("")}
+       </div>
+       <div class="choice ex-opts">
+         <label><input type="checkbox" id="ex-edits" ${saved.applyEdits ? "checked" : ""} ${anyEdits ? "" : "disabled"}> Apply my edits <span class="muted">(colour, crop, straighten, rotation)</span></label>
+         <label><input type="checkbox" id="ex-meta" ${saved.metadata ? "checked" : ""}> Include details <span class="muted">(date, location, caption, favourite, camera settings)</span></label>
+         <label><input type="checkbox" id="ex-sound" ${saved.sound ? "checked" : ""} ${anySound ? "" : "disabled"}> Save sound as a .wav next to each photo</label>
+       </div>
+       <div class="modal-actions">
+         <span class="muted small">Files are named after the disc, album and photo number.</span>
+         <span class="spacer"></span>
+         <button class="btn" id="ex-cancel">Cancel</button>
+         <button class="btn primary" id="ex-go">Choose folder…</button>
+       </div>`,
+      { onClose: () => resolve(result) },
+    );
+    m.el.querySelector("#ex-cancel")!.addEventListener("click", m.close);
+    m.el.querySelector("#ex-go")!.addEventListener("click", () => {
+      const q = <T extends HTMLElement>(s: string) => m.el.querySelector<T>(s)!;
+      result = {
+        scale: +(m.el.querySelector<HTMLInputElement>('input[name="scale"]:checked')?.value ?? 1),
+        sound: q<HTMLInputElement>("#ex-sound").checked,
+        applyEdits: q<HTMLInputElement>("#ex-edits").checked,
+        metadata: q<HTMLInputElement>("#ex-meta").checked,
+      };
+      prefs.set("export", result);
+      m.close();
+    });
+  });
+}

@@ -1,8 +1,12 @@
 //! Export photos as ordinary JPEGs plus the sound as a WAV of the same name.
 //!
 //! EXIF written: camera, shutter, flash, size; the date/time (the user's edit, else the camera's
-//! when its clock was set); GPS position from the user's location edit; orientation from their
-//! rotation (lossless: the JPEG data is untouched, viewers rotate it).
+//! when its clock was set); GPS position from the user's location edit; the caption.
+//! XMP written (read by Photos, Lightroom, etc.): caption, place name, rating 5 for favourites.
+//!
+//! A photo whose only change is a rotation keeps its original JPEG data (EXIF orientation tells
+//! viewers to turn it). Any other edit (colour, crop, straighten, flip, noise) or an upscale is
+//! rendered by [`crate::adjust::render`] and saved as a new JPEG at quality 93.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -137,17 +141,26 @@ fn orientation(rotation: u16) -> u16 {
 }
 
 /// JPEG with an EXIF segment inserted right after SOI. `date` is "YYYY:MM:DD HH:MM:SS".
-pub fn jpeg_with_exif(jpeg: &[u8], info: &PhotoInfo, date: Option<&str>, edits: &PhotoEdits) -> Vec<u8> {
+/// `size` is the pixel size of `jpeg`; `orient` whether viewers should apply `edits.rotation`
+/// (false when the rotation is already in the pixels).
+pub fn jpeg_with_exif(
+    jpeg: &[u8],
+    info: &PhotoInfo,
+    date: Option<&str>,
+    edits: &PhotoEdits,
+    size: (u32, u32),
+    orient: bool,
+) -> Vec<u8> {
     let mut ifd0 = vec![
         (0x010F, Val::Ascii("SONY".into())),
         (0x0110, Val::Ascii("DSC-MD1".into())),
-        (0x0112, Val::Short(orientation(edits.rotation))),
+        (0x0112, Val::Short(if orient { orientation(edits.rotation) } else { 1 })),
         (0x0131, Val::Ascii("MD1 Studio".into())),
     ];
     let mut exif = vec![
         (0x9000, Val::Undefined(b"0230".to_vec())),
-        (0xA002, Val::Short(info.width)),
-        (0xA003, Val::Short(info.height)),
+        (0xA002, Val::Long(size.0)),
+        (0xA003, Val::Long(size.1)),
     ];
     if let Some((n, d)) = info.shutter.as_deref().and_then(shutter_rational) {
         exif.push((0x829A, Val::Rational(n, d)));
@@ -169,15 +182,60 @@ pub fn jpeg_with_exif(jpeg: &[u8], info: &PhotoInfo, date: Option<&str>, edits: 
             (0x0004, Val::Rationals(dms(l.lon))),
         ]
     });
-    if let Some(name) = edits.location.as_ref().and_then(|l| l.name.as_ref()) {
-        ifd0.push((0x010E, Val::Ascii(name.chars().filter(|c| c.is_ascii() && !c.is_ascii_control()).collect())));
+    if let Some(c) = &edits.caption {
+        let ascii: String = c.chars().filter(|c| c.is_ascii() && !c.is_ascii_control()).collect();
+        if !ascii.trim().is_empty() {
+            ifd0.push((0x010E, Val::Ascii(ascii)));
+        }
     }
     let app1 = exif_app1(ifd0, exif, gps);
-    let mut out = Vec::with_capacity(jpeg.len() + app1.len());
+    let xmp = xmp_app1(edits, date);
+    let mut out = Vec::with_capacity(jpeg.len() + app1.len() + xmp.len());
     out.extend_from_slice(&jpeg[..2]);
     out.extend_from_slice(&app1);
+    out.extend_from_slice(&xmp);
     out.extend_from_slice(&jpeg[2..]);
     out
+}
+
+fn xml_escape(s: &str) -> String {
+    s.replace('&', "&amp;").replace('<', "&lt;").replace('>', "&gt;").replace('"', "&quot;")
+}
+
+/// XMP packet (UTF-8): caption, place name, favourite as a 5-star rating, creation date.
+fn xmp_app1(edits: &PhotoEdits, date: Option<&str>) -> Vec<u8> {
+    let mut attrs = String::from(r#" xmp:CreatorTool="MD1 Studio""#);
+    if edits.favorite {
+        attrs.push_str(r#" xmp:Rating="5""#);
+    }
+    if let Some(d) = date {
+        // "YYYY:MM:DD HH:MM:SS" → ISO 8601
+        let iso = format!("{}T{}", d[..10].replace(':', "-"), &d[11..]);
+        attrs.push_str(&format!(r#" photoshop:DateCreated="{iso}" xmp:CreateDate="{iso}""#));
+    }
+    let mut body = String::new();
+    if let Some(c) = &edits.caption {
+        body.push_str(&format!(
+            r#"<dc:description><rdf:Alt><rdf:li xml:lang="x-default">{}</rdf:li></rdf:Alt></dc:description>"#,
+            xml_escape(c)
+        ));
+    }
+    if let Some(name) = edits.location.as_ref().and_then(|l| l.name.as_ref()) {
+        body.push_str(&format!("<Iptc4xmpCore:Location>{}</Iptc4xmpCore:Location>", xml_escape(name)));
+    }
+    let packet = format!(
+        "<?xpacket begin=\"\u{feff}\" id=\"W5M0MpCehiHzreSzNTczkc9d\"?>\
+<x:xmpmeta xmlns:x=\"adobe:ns:meta/\"><rdf:RDF xmlns:rdf=\"http://www.w3.org/1999/02/22-rdf-syntax-ns#\">\
+<rdf:Description rdf:about=\"\" xmlns:dc=\"http://purl.org/dc/elements/1.1/\" xmlns:xmp=\"http://ns.adobe.com/xap/1.0/\" \
+xmlns:photoshop=\"http://ns.adobe.com/photoshop/1.0/\" xmlns:Iptc4xmpCore=\"http://iptc.org/std/Iptc4xmpCore/1.0/xmlns/\"{attrs}>\
+{body}</rdf:Description></rdf:RDF></x:xmpmeta><?xpacket end=\"w\"?>"
+    );
+    let mut seg = vec![0xFF, 0xE1];
+    let header = b"http://ns.adobe.com/xap/1.0/\0";
+    seg.extend_from_slice(&((2 + header.len() + packet.len()) as u16).to_be_bytes());
+    seg.extend_from_slice(header);
+    seg.extend_from_slice(packet.as_bytes());
+    seg
 }
 
 fn sanitize(s: &str) -> String {
@@ -202,24 +260,59 @@ pub struct ExportResult {
     pub already_there: usize,
 }
 
-pub fn export_photos(photos: &[(&str, &Photo)], dest: &Path, with_exif: bool) -> Result<ExportResult, Error> {
+#[derive(Debug, Clone, Copy)]
+pub struct ExportOptions {
+    /// 1, 2 or 3: upscale the exported JPEG (Lanczos + light sharpening).
+    pub scale: f64,
+    /// Write the photo's sound next to it as a WAV.
+    pub sound: bool,
+    /// Apply colour / crop / straighten / flip / rotation edits.
+    pub apply_edits: bool,
+    /// Write EXIF + XMP metadata (camera, date, GPS, caption, rating).
+    pub metadata: bool,
+}
+
+impl Default for ExportOptions {
+    fn default() -> Self {
+        Self { scale: 1.0, sound: true, apply_edits: true, metadata: true }
+    }
+}
+
+/// The exported JPEG for one photo, with the chosen options.
+pub fn export_jpeg(p: &Photo, opts: &ExportOptions) -> Result<Vec<u8>, Error> {
+    let pmp = fs::read(&p.pmp_path)?;
+    let jpeg = crate::formats::extract_jpeg(&pmp).ok_or_else(|| Error::Protocol(format!("{}: no JPEG inside", p.stem)))?;
+    // The user's date wins; otherwise the camera's, but only if its clock was set.
+    let date = p
+        .edits
+        .taken
+        .as_deref()
+        .or(p.created.as_deref().filter(|_| !p.clock_unset))
+        .map(|d| d.replace('-', ":"));
+    let edits = if opts.apply_edits { p.edits.clone() } else { PhotoEdits { rotation: 0, ..p.edits.clone() } };
+    let render = opts.apply_edits && edits.has_look() || opts.scale > 1.0;
+    let (body, size, orient) = if render {
+        let img = crate::adjust::decode_jpeg(jpeg).ok_or_else(|| Error::Protocol(format!("{}: unreadable JPEG", p.stem)))?;
+        let look = if opts.apply_edits { edits.clone() } else { PhotoEdits::default() };
+        let out = crate::adjust::render(&img, &look, opts.scale);
+        let size = (out.width(), out.height());
+        (crate::adjust::encode_jpeg(&out, 93), size, false)
+    } else {
+        (jpeg.to_vec(), (p.info.width as u32, p.info.height as u32), opts.apply_edits)
+    };
+    Ok(if opts.metadata { jpeg_with_exif(&body, &p.info, date.as_deref(), &edits, size, orient) } else { body })
+}
+
+pub fn export_photos(photos: &[(&str, &Photo)], dest: &Path, opts: &ExportOptions) -> Result<ExportResult, Error> {
     fs::create_dir_all(dest)?;
     let mut res = ExportResult { written: Vec::new(), already_there: 0 };
     for (disc_name, p) in photos {
         let stem = sanitize(&format!("{disc_name} {} {}", p.album, p.stem));
-        let pmp = fs::read(&p.pmp_path)?;
-        let Some(jpeg) = crate::formats::extract_jpeg(&pmp) else { continue };
-        // The user's date wins; otherwise the camera's, but only if its clock was set.
-        let date = p
-            .edits
-            .taken
-            .as_deref()
-            .or(p.created.as_deref().filter(|_| !p.clock_unset))
-            .map(|d| d.replace('-', ":"));
-        let out = if with_exif { jpeg_with_exif(jpeg, &p.info, date.as_deref(), &p.edits) } else { jpeg.to_vec() };
-        let mut files = vec![("jpg", out)];
-        if let Some(w) = &p.wav_path {
-            files.push(("wav", fs::read(w)?));
+        let mut files = vec![("jpg", export_jpeg(p, opts)?)];
+        if opts.sound {
+            if let Some(w) = &p.wav_path {
+                files.push(("wav", fs::read(w)?));
+            }
         }
         for (ext, data) in files {
             match free_path(dest, &stem, ext, &data) {
@@ -252,14 +345,17 @@ mod tests {
         };
         let edits = PhotoEdits {
             location: Some(crate::edits::Location { lat: 47.6097, lon: -122.3422, name: Some("Pike Place".into()) }),
-            taken: None,
             rotation: 90,
+            caption: Some("Fish throwing".into()),
+            favorite: true,
+            ..Default::default()
         };
-        let j = jpeg_with_exif(&[0xFF, 0xD8, 0xFF, 0xD9], &info, Some("1998:05:03 10:00:00"), &edits);
+        let j = jpeg_with_exif(&[0xFF, 0xD8, 0xFF, 0xD9], &info, Some("1998:05:03 10:00:00"), &edits, (640, 480), true);
+        assert!(j.windows(13).any(|w| w == b"xmp:Rating=\"5"));
         assert_eq!(&j[..4], &[0xFF, 0xD8, 0xFF, 0xE1]);
         let len = u16::from_be_bytes([j[4], j[5]]) as usize;
         assert_eq!(&j[6..12], b"Exif\0\0");
-        assert_eq!(&j[4 + len..], &[0xFF, 0xD9]);
+        assert_eq!(&j[4 + len..4 + len + 2], &[0xFF, 0xE1]); // XMP follows EXIF
         let tiff = &j[12..4 + len];
         assert_eq!(&tiff[..4], b"MM\x00\x2A");
         let n = u16::from_be_bytes([tiff[8], tiff[9]]);
