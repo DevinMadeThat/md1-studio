@@ -9,6 +9,8 @@
 **/listing.txt
 **/disc-manifest.txt
 **/disc.json
+# Your edits: places (GPS coordinates) and dates of your photos.
+**/edits.json
 *.PMP
 *.PMA
 *.PMX

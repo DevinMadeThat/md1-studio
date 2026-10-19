@@ -7,8 +7,10 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
+use std::time::{Duration, Instant};
 
 use md1_core::camera::{self, Camera, Connection, Status, VolumeInfo};
+use md1_core::edits::{self, EditPatch};
 use md1_core::import::{self, DiscMeta, ImportEvent, ImportOptions};
 use md1_core::library::{self, Disc, Photo};
 use md1_core::transport::{self, PortInfo};
@@ -367,6 +369,166 @@ async fn export_photos(items: Vec<ExportItem>, dest: String, exif: bool) -> CmdR
     .map_err(err)?
 }
 
+// ---------- metadata edits ----------
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PhotoPatch {
+    photo_id: String,
+    #[serde(flatten)]
+    patch: EditPatch,
+}
+
+/// Apply location / date / rotation edits to photos of one disc; returns the updated disc.
+#[tauri::command]
+async fn edit_photos(disc_path: String, patches: Vec<PhotoPatch>) -> CmdResult<Disc> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let dir = PathBuf::from(&disc_path);
+        let list: Vec<(String, EditPatch)> = patches.into_iter().map(|p| (p.photo_id, p.patch)).collect();
+        edits::apply(&dir, &list)?;
+        library::scan_disc(&dir).ok_or_else(|| "disc folder not found".to_string())
+    })
+    .await
+    .map_err(err)?
+}
+
+// ---------- places & maps (OpenStreetMap: Nominatim geocoder, standard tiles) ----------
+
+const USER_AGENT: &str = concat!(
+    "MD1Studio/",
+    env!("CARGO_PKG_VERSION"),
+    " (desktop app for the Sony DSC-MD1; https://github.com/DevinMadeThat/md1-studio)"
+);
+
+/// Nominatim's usage policy: at most one request per second, identified by User-Agent.
+static LAST_GEOCODE: Mutex<Option<Instant>> = Mutex::new(None);
+
+fn polite_wait() {
+    let mut last = LAST_GEOCODE.lock().unwrap();
+    if let Some(t) = *last {
+        let since = t.elapsed();
+        if since < Duration::from_millis(1100) {
+            std::thread::sleep(Duration::from_millis(1100) - since);
+        }
+    }
+    *last = Some(Instant::now());
+}
+
+fn url_encode(s: &str) -> String {
+    s.bytes()
+        .map(|b| match b {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'_' | b'.' | b'~' => (b as char).to_string(),
+            b' ' => "+".to_string(),
+            _ => format!("%{b:02X}"),
+        })
+        .collect()
+}
+
+fn get_json(url: &str) -> Result<serde_json::Value, String> {
+    polite_wait();
+    let mut resp = ureq::get(url)
+        .header("User-Agent", USER_AGENT)
+        .header("Accept-Language", "en")
+        .call()
+        .map_err(|e| format!("Place search failed: {e}"))?;
+    resp.body_mut().read_json::<serde_json::Value>().map_err(err)
+}
+
+#[derive(Serialize)]
+struct Place {
+    name: String,
+    lat: f64,
+    lon: f64,
+}
+
+#[tauri::command]
+async fn geocode(query: String) -> CmdResult<Vec<Place>> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let url = format!(
+            "https://nominatim.openstreetmap.org/search?format=jsonv2&limit=6&q={}",
+            url_encode(query.trim())
+        );
+        let v = get_json(&url)?;
+        Ok(v.as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|p| {
+                Some(Place {
+                    name: p["display_name"].as_str()?.to_string(),
+                    lat: p["lat"].as_str()?.parse().ok()?,
+                    lon: p["lon"].as_str()?.parse().ok()?,
+                })
+            })
+            .collect())
+    })
+    .await
+    .map_err(err)?
+}
+
+/// Name of the place at a coordinate (best effort; None when offline or nothing is there).
+#[tauri::command]
+async fn reverse_geocode(lat: f64, lon: f64) -> CmdResult<Option<String>> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let url = format!("https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=17&lat={lat}&lon={lon}");
+        Ok(get_json(&url).ok().and_then(|v| v["display_name"].as_str().map(str::to_string)))
+    })
+    .await
+    .map_err(err)?
+}
+
+/// Follow a short map link (maps.app.goo.gl/…, goo.gl/maps/…) to the full URL, which carries
+/// the coordinates. Only http(s) links; at most 5 redirects.
+#[tauri::command]
+async fn expand_url(url: String) -> CmdResult<String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut current = url.trim().to_string();
+        for _ in 0..5 {
+            if !(current.starts_with("https://") || current.starts_with("http://")) {
+                break;
+            }
+            let resp = ureq::get(&current)
+                .header("User-Agent", USER_AGENT)
+                .config()
+                .max_redirects(0)
+                .http_status_as_error(false)
+                .build()
+                .call()
+                .map_err(err)?;
+            match resp.headers().get("location").and_then(|v| v.to_str().ok()) {
+                Some(next) if resp.status().is_redirection() => current = next.to_string(),
+                _ => break,
+            }
+        }
+        Ok(current)
+    })
+    .await
+    .map_err(err)?
+}
+
+/// One 256×256 OpenStreetMap tile (PNG), cached on disk.
+#[tauri::command]
+async fn map_tile(app: AppHandle, z: u32, x: u32, y: u32) -> Result<tauri::ipc::Response, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        if z > 19 || x >= 1 << z || y >= 1 << z {
+            return Err("bad tile".to_string());
+        }
+        let cache = app.path().app_cache_dir().map_err(err)?.join("tiles").join(format!("{z}/{x}/{y}.png"));
+        if let Ok(b) = fs::read(&cache) {
+            return Ok(tauri::ipc::Response::new(b));
+        }
+        let mut resp = ureq::get(&format!("https://tile.openstreetmap.org/{z}/{x}/{y}.png"))
+            .header("User-Agent", USER_AGENT)
+            .call()
+            .map_err(err)?;
+        let bytes = resp.body_mut().read_to_vec().map_err(err)?;
+        let _ = fs::create_dir_all(cache.parent().unwrap());
+        let _ = fs::write(&cache, &bytes);
+        Ok(tauri::ipc::Response::new(bytes))
+    })
+    .await
+    .map_err(err)?
+}
+
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -413,6 +575,11 @@ pub fn run() {
             cancel_import,
             import_disc,
             export_photos,
+            edit_photos,
+            geocode,
+            reverse_geocode,
+            map_tile,
+            expand_url,
         ])
         .run(tauri::generate_context!())
         .expect("error while running MD1 Studio");

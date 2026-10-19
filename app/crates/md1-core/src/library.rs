@@ -7,6 +7,7 @@ use std::path::Path;
 use serde::Serialize;
 
 use crate::dostime::DosTime;
+use crate::edits::{self, PhotoEdits};
 use crate::formats::{self, PhotoInfo};
 use crate::import::{self, albums_root, DiscMeta};
 
@@ -33,6 +34,8 @@ pub struct Photo {
     /// shown by the camera.
     pub in_index: bool,
     pub protected: bool,
+    /// The user's edits (location, date/time, rotation); the camera files are never changed.
+    pub edits: PhotoEdits,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -87,6 +90,7 @@ pub fn scan_disc(disc_dir: &Path) -> Option<Disc> {
     let mirror = disc_dir.join("listing.txt").exists();
     let meta = DiscMeta::load(disc_dir).unwrap_or_default();
     let times = listing_times(disc_dir);
+    let user_edits = edits::load(disc_dir);
     // Make sure JPEG/WAV copies exist (older backups may predate sound decoding).
     let _ = import::convert_disc(disc_dir);
 
@@ -148,6 +152,7 @@ pub fn scan_disc(disc_dir: &Path) -> Option<Disc> {
                 clock_unset: created.is_some_and(|t| t.clock_unset()),
                 in_index: pos < indexed,
                 protected: record.is_some_and(|r| r.protected),
+                edits: user_edits.get(&format!("{album}/{stem}")).cloned().unwrap_or_default(),
             });
         }
         albums.push(Album { name: album, photos });

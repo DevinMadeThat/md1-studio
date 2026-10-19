@@ -9,6 +9,7 @@
 
 pub mod camera;
 pub mod dostime;
+pub mod edits;
 pub mod export;
 pub mod formats;
 pub mod frame;

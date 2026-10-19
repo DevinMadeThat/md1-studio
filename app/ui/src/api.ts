@@ -63,6 +63,34 @@ export interface PhotoInfo {
   jpeg_len: number;
 }
 
+export interface Location {
+  lat: number;
+  lon: number;
+  name?: string | null;
+}
+
+export interface PhotoEdits {
+  location?: Location | null;
+  /** "YYYY-MM-DD HH:MM:SS", local time */
+  taken?: string | null;
+  /** clockwise degrees */
+  rotation?: number;
+}
+
+export interface EditPatch {
+  setLocation?: Location;
+  clearLocation?: boolean;
+  setTaken?: string;
+  clearTaken?: boolean;
+  rotateBy?: number;
+}
+
+export interface Place {
+  name: string;
+  lat: number;
+  lon: number;
+}
+
 export interface Photo {
   id: string;
   album: string;
@@ -78,6 +106,7 @@ export interface Photo {
   clockUnset: boolean;
   inIndex: boolean;
   protected: boolean;
+  edits: PhotoEdits;
 }
 
 export interface Album {
@@ -136,6 +165,12 @@ export const api = {
   cancelImport: () => invoke<void>("cancel_import"),
   exportPhotos: (items: { discPath: string; photoId: string }[], dest: string, exif: boolean) =>
     invoke<ExportSummary>("export_photos", { items, dest, exif }),
+  editPhotos: (discPath: string, patches: ({ photoId: string } & EditPatch)[]) =>
+    invoke<Disc>("edit_photos", { discPath, patches }),
+  geocode: (query: string) => invoke<Place[]>("geocode", { query }),
+  reverseGeocode: (lat: number, lon: number) => invoke<string | null>("reverse_geocode", { lat, lon }),
+  expandUrl: (url: string) => invoke<string>("expand_url", { url }),
+  mapTile: (z: number, x: number, y: number) => invoke<ArrayBuffer>("map_tile", { z, x, y }),
 };
 
 export const fileUrl = (path: string) => convertFileSrc(path);

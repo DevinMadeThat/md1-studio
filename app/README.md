@@ -20,8 +20,20 @@ mirrors `md1tool/md1.py`, which was proven on a real camera.
 * **Library**: discs in the sidebar; photo grid with sound / FINE badges; filters (all / sound /
   fine); a viewer with keyboard navigation, waveform sound player, and metadata (quality,
   shutter speed, flash, shot time, file).
+* **Viewer**: pinch / ⌘± / double-click to zoom, drag or two-finger scroll to pan; the zoom and
+  position carry over as you step through photos. Optional auto-play and loop of the sound.
+* **Edit metadata** (one photo, or a selection: shift-click for ranges, ⌘-click to toggle, ⌘A):
+  * **Location**: search a place (OpenStreetMap's Nominatim geocoder; no account or key), or
+    paste coordinates in any common form or a Google/Apple Maps link (short `maps.app.goo.gl`
+    links are expanded). Shows a map preview; remembers recent places.
+  * **Date & time**: set it for one photo, the same for many, or "keep the time between shots"
+    (the earliest gets the date you enter; the rest keep the gaps the camera recorded, which
+    still works when the camera's clock battery is dead).
+  * **Rotate** left/right.
+  Edits live in `<disc>/edits.json`; the camera files in the backup are never modified.
 * **Export**: selected photos or a whole disc → JPEGs with EXIF (Sony DSC-MD1, shutter, flash,
-  date when the camera clock was set) plus a matching `.wav` for photos with sound.
+  your date (or the camera's when its clock was set), GPS position + place name, orientation)
+  plus a matching `.wav` for photos with sound.
 * **Open old backups**: "Add backup folder…" accepts any `downloads/discN` folder made by
   `md1tool` (full mirrors and the older photo-only `raw/` layout).
 
@@ -103,6 +115,8 @@ the real camera's reply layouts, and `--allow-writes` applies writes to a tempor
 * Library (default): `~/Pictures/MD1 Studio/<disc name>/` — same layout as `md1tool`
   (`disc/`, `listing.txt`, `jpeg/`, `audio/`, `thumbnails/`, `disc-manifest.txt`) plus
   `disc.json` (name, camera, format time, import history).
+* Map tiles (OpenStreetMap, cached): the OS cache folder. Place searches go to
+  nominatim.openstreetmap.org only when you press Find / paste; nothing else leaves the machine.
 * Settings: the OS app-config folder (`~/Library/Application Support/app.md1studio.desktop/`).
 * Serial traces of every session (md1tool's log format, readable with `md1tool/trace.py`):
   the OS log folder (`~/Library/Logs/app.md1studio.desktop/`).

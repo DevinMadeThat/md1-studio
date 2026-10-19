@@ -1,8 +1,14 @@
 import { listen } from "@tauri-apps/api/event";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open } from "@tauri-apps/plugin-dialog";
-import { revealItemInDir } from "@tauri-apps/plugin-opener";
+import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
 import { api, fileUrl, type CameraInfo, type Disc, type ImportEvent, type Photo, type PortInfo, type Settings } from "./api";
+import { effectiveTaken, googleMapsUrl, openDateEditor, openLocationEditor } from "./editors";
+import { formatLatLon } from "./geo";
 import { icon } from "./icons";
+import { renderMap } from "./map";
+import { esc, prefs, toast } from "./ui";
+import { ZoomStage, type ZoomShared } from "./zoom";
 
 // ---------------------------------------------------------------- state
 
@@ -39,13 +45,17 @@ const state = {
   imp: null as ImportState | null,
   filter: "all" as Filter,
   selection: new Set<string>(),
+  /** Last photo clicked: the start of a shift-click range. */
+  anchor: null as string | null,
   renaming: false,
 };
 
-const $ = <T extends HTMLElement = HTMLElement>(sel: string, root: ParentNode = document) => root.querySelector<T>(sel)!;
-const esc = (s: unknown) =>
-  String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+/** Replace a disc after an edit, keeping the user's place. */
+function updateDisc(d: Disc) {
+  state.discs = state.discs.map((x) => (x.path === d.path ? d : x));
+}
 
+const $ = <T extends HTMLElement = HTMLElement>(sel: string, root: ParentNode = document) => root.querySelector<T>(sel)!;
 const fmtBytes = (n: number) =>
   n >= 1e6 ? `${(n / 1e6).toFixed(1)} MB` : n >= 1e3 ? `${Math.round(n / 1e3)} KB` : `${n} B`;
 const fmtSecs = (s: number) => {
@@ -61,18 +71,6 @@ function visiblePhotos(d: Disc): Photo[] {
   if (state.filter === "sound") return all.filter((p) => p.soundSeconds != null);
   if (state.filter === "fine") return all.filter((p) => p.info.quality === "FINE");
   return all;
-}
-
-// ---------------------------------------------------------------- toast
-
-let toastTimer = 0;
-function toast(msg: string, action?: { label: string; run: () => void }, kind: "info" | "error" = "info") {
-  const t = $("#toast");
-  t.className = `toast show ${kind}`;
-  t.innerHTML = `<span>${esc(msg)}</span>${action ? `<button class="toast-action">${esc(action.label)}</button>` : ""}`;
-  if (action) t.querySelector("button")!.addEventListener("click", () => { action.run(); t.classList.remove("show"); });
-  clearTimeout(toastTimer);
-  toastTimer = window.setTimeout(() => t.classList.remove("show"), kind === "error" ? 9000 : 6000);
 }
 
 // ---------------------------------------------------------------- sidebar
@@ -93,7 +91,7 @@ function renderSidebar() {
     })
     .join("");
   $("#sidebar").innerHTML = `
-    <div class="sidebar-top" data-tauri-drag-region></div>
+    <div class="sidebar-top" data-drag></div>
     <div class="nav-section">Camera</div>
     <button class="nav-item ${state.view.kind === "camera" ? "active" : ""}" data-nav="camera">
       <span class="nav-icon">${icon.camera()}</span>
@@ -129,7 +127,7 @@ function renderCamera() {
       .map((p) => `<option value="${esc(p.path)}" ${p.path === state.port ? "selected" : ""}>${esc(p.path.replace("/dev/", ""))}${p.description ? ` — ${esc(p.description)}` : ""}${p.likely_adapter ? " ★" : ""}</option>`)
       .join("");
     main.innerHTML = `
-      <header class="toolbar" data-tauri-drag-region><div class="tb-title">Camera</div></header>
+      <header class="toolbar" data-drag><div class="tb-title">Camera</div></header>
       <div class="page">
         <section class="hero">
           <div class="hero-art">${icon.camera(44)}</div>
@@ -216,7 +214,7 @@ function renderCamera() {
   }
 
   main.innerHTML = `
-    <header class="toolbar" data-tauri-drag-region><div class="tb-title">Camera</div></header>
+    <header class="toolbar" data-drag><div class="tb-title">Camera</div></header>
     <div class="page"><div class="cards">${statusCard}${discCard}${importCard}</div></div>`;
 }
 
@@ -250,9 +248,10 @@ function renderDisc(d: Disc) {
       .map((p) => {
         const selected = sel.has(p.id);
         return `<div class="tile ${selected ? "selected" : ""}" data-photo="${esc(p.id)}" tabindex="0">
-          ${p.jpegPath ? `<img loading="lazy" src="${fileUrl(p.jpegPath)}" alt="${esc(p.stem)}">` : `<div class="noimg">no image</div>`}
-          <button class="tile-check" data-select="${esc(p.id)}" title="Select">${icon.check(13)}</button>
+          ${p.jpegPath ? `<img loading="lazy" src="${fileUrl(p.jpegPath)}" alt="${esc(p.stem)}" class="rot${p.edits.rotation ?? 0}">` : `<div class="noimg">no image</div>`}
+          <button class="tile-check" data-select="${esc(p.id)}" title="Select (shift-click for a range)">${icon.check(13)}</button>
           <div class="tile-badges">
+            ${p.edits.location ? `<span class="badge plain" title="${esc(p.edits.location.name || formatLatLon(p.edits.location))}">${icon.pin(12)}</span>` : ""}
             ${p.soundSeconds != null ? `<span class="badge sound" title="Has sound (${p.soundSeconds.toFixed(1)} s)">${icon.sound(12)}</span>` : ""}
             ${p.info.quality === "FINE" ? `<span class="badge">FINE</span>` : ""}
             ${!p.inIndex ? `<span class="badge warn" title="Not in the camera's album index">hidden</span>` : ""}
@@ -277,7 +276,7 @@ function renderDisc(d: Disc) {
   ].filter(Boolean).join(" · ");
 
   $("#main").innerHTML = `
-    <header class="toolbar" data-tauri-drag-region>
+    <header class="toolbar" data-drag>
       <div class="tb-title">
         ${state.renaming
           ? `<input id="rename" class="field rename" value="${esc(d.name)}">`
@@ -290,7 +289,16 @@ function renderDisc(d: Disc) {
       <button class="btn icon-btn" data-action="reveal-disc" title="Show in ${state.settings?.platform === "macos" ? "Finder" : "file manager"}">${icon.finder()}</button>
       <button class="btn" data-action="export">${icon.export(15)} ${sel.size ? `Export ${sel.size}` : "Export all"}…</button>
     </header>
-    ${sel.size ? `<div class="selbar">${plural(sel.size, "photo")} selected <button class="linkish" data-action="clear-selection">Clear</button> <button class="linkish" data-action="select-all">Select all</button></div>` : ""}
+    ${sel.size ? `<div class="selbar">
+      <span class="selcount">${plural(sel.size, "photo")} selected</span>
+      <button class="btn small" data-action="sel-location">${icon.pin(14)} Location…</button>
+      <button class="btn small" data-action="sel-date">${icon.calendar(14)} Date &amp; time…</button>
+      <button class="btn small icon-btn" data-action="sel-rotate-left" title="Rotate left">${icon.rotateLeft(14)}</button>
+      <button class="btn small icon-btn" data-action="sel-rotate-right" title="Rotate right">${icon.rotateRight(14)}</button>
+      <span class="spacer"></span>
+      <button class="linkish" data-action="select-all">Select all</button>
+      <button class="linkish" data-action="clear-selection">Clear</button>
+    </div>` : ""}
     <div class="page">
       ${d.kind === "photos" ? `<div class="callout">This backup holds photo files only (it was made before full-disc copies). Put this disc back in the camera and import it to add its sound recordings, thumbnails and shot times.</div>` : ""}
       ${photos.length ? body : `<div class="empty">No ${state.filter === "sound" ? "photos with sound" : state.filter === "fine" ? "fine-quality photos" : "photos"} on this disc.</div>`}
@@ -315,20 +323,36 @@ function renderDisc(d: Disc) {
 
 // ---------------------------------------------------------------- viewer
 
-const viewer = { open: false, list: [] as Photo[], index: 0, disc: null as Disc | null, audio: null as HTMLAudioElement | null, raf: 0 };
+const viewer = {
+  open: false,
+  list: [] as Photo[],
+  index: 0,
+  disc: null as Disc | null,
+  audio: null as HTMLAudioElement | null,
+  raf: 0,
+  stage: null as ZoomStage | null,
+};
+/** Zoom/pan carried from photo to photo while the viewer is open. */
+const zoom: ZoomShared = { z: 1, nx: 0, ny: 0 };
+const playback = { auto: prefs.get("autoplay", false), loop: prefs.get("loop", false) };
 
 function openViewer(d: Disc, id: string) {
   viewer.disc = d;
   viewer.list = visiblePhotos(d);
   viewer.index = Math.max(0, viewer.list.findIndex((p) => p.id === id));
   viewer.open = true;
-  renderViewer();
+  state.anchor = id;
+  Object.assign(zoom, { z: 1, nx: 0, ny: 0 });
+  renderViewer(true);
 }
 
 function closeViewer() {
   viewer.open = false;
   stopAudio();
+  viewer.stage?.destroy();
+  viewer.stage = null;
   $("#viewer").classList.remove("show");
+  render();
 }
 
 function stopAudio() {
@@ -336,30 +360,62 @@ function stopAudio() {
   cancelAnimationFrame(viewer.raf);
 }
 
+function go(delta: number) {
+  const i = viewer.index + delta;
+  if (i < 0 || i >= viewer.list.length) return;
+  viewer.index = i;
+  state.anchor = viewer.list[i].id;
+  renderViewer(true);
+}
+
+/** After an edit: refresh the photo list from the updated disc and redraw in place. */
+function viewerDiscUpdated(d: Disc) {
+  updateDisc(d);
+  const id = viewer.list[viewer.index]?.id;
+  viewer.disc = d;
+  viewer.list = visiblePhotos(d);
+  viewer.index = Math.max(0, viewer.list.findIndex((p) => p.id === id));
+  renderViewer(false);
+}
+
 function fact(label: string, value: string) {
   return `<dt>${label}</dt><dd>${value}</dd>`;
 }
 
-function renderViewer() {
+function zoomLabel(z: number) {
+  const b = document.getElementById("zoom-badge");
+  if (!b) return;
+  b.classList.toggle("show", z > 1.01);
+  b.querySelector("span")!.textContent = `${Math.round(z * 100)}%`;
+}
+
+function renderViewer(navigated: boolean) {
   stopAudio();
+  viewer.stage?.destroy();
+  viewer.stage = null;
   const p = viewer.list[viewer.index];
   const d = viewer.disc!;
   if (!p) return closeViewer();
-  const taken = p.created
-    ? p.clockUnset
-      ? `${esc(p.created.slice(11))} <span class="muted">(time since the clock started — the camera's date was not set)</span>`
-      : esc(p.created)
-    : `<span class="muted">unknown</span>`;
+  const taken = effectiveTaken(p);
+  const takenHtml = taken
+    ? `${esc(taken)}${p.edits.taken ? ` <span class="tag">edited</span>` : ""}`
+    : p.created
+      ? `${esc(p.created.slice(11))} <span class="muted">(camera clock not set: time since it was switched on)</span>`
+      : `<span class="muted">unknown</span>`;
+  const loc = p.edits.location;
   const el = $("#viewer");
   el.innerHTML = `
-    <div class="v-top" data-tauri-drag-region>
+    <div class="v-top" data-drag>
       <button class="v-btn" data-v="close" title="Close (Esc)">${icon.close(18)}</button>
-      <div class="v-title">${esc(d.name)} · ${esc(p.album)} · photo ${p.number + 1}</div>
-      <div class="v-count">${viewer.index + 1} / ${viewer.list.length}</div>
+      <div class="v-title" data-drag>${esc(d.name)} · ${esc(p.album)} · photo ${p.number + 1}</div>
+      <div class="v-count" data-drag>${viewer.index + 1} / ${viewer.list.length}</div>
     </div>
     <div class="v-body">
       <button class="v-nav left" data-v="prev" ${viewer.index === 0 ? "disabled" : ""}>${icon.left(26)}</button>
-      <div class="v-stage">${p.jpegPath ? `<img src="${fileUrl(p.jpegPath)}" alt="">` : ""}</div>
+      <div class="v-stage" id="v-stage">
+        ${p.jpegPath ? `<img id="v-img" src="${fileUrl(p.jpegPath)}" alt="" draggable="false">` : ""}
+        <div class="zoom-badge" id="zoom-badge"><span>100%</span><button data-v="zoom-reset" title="Fit (0)">Fit</button></div>
+      </div>
       <button class="v-nav right" data-v="next" ${viewer.index >= viewer.list.length - 1 ? "disabled" : ""}>${icon.right(26)}</button>
       <aside class="v-info">
         ${p.wavPath ? `
@@ -368,13 +424,41 @@ function renderViewer() {
             <div class="wave"><canvas id="wave"></canvas></div>
             <div class="ptime"><span id="ptime">0:00</span> / ${fmtSecs(p.soundSeconds ?? 0)}</div>
           </div>` : ""}
+        <div class="toggles">
+          <label class="switch"><input type="checkbox" data-pref="autoplay" ${playback.auto ? "checked" : ""}><i></i> Play sound automatically</label>
+          <label class="switch"><input type="checkbox" data-pref="loop" ${playback.loop ? "checked" : ""}><i></i> ${icon.loop(13)} Loop sound</label>
+        </div>
+
+        <div class="v-section">
+          <div class="v-section-head">${icon.pin(14)} Location
+            <button class="linkish" data-v="edit-location">${loc ? "Change" : "Add"}</button></div>
+          ${loc ? `
+            <div class="map small-map" id="v-map"></div>
+            <div class="v-place">${esc(loc.name || "")}</div>
+            <div class="small muted">${formatLatLon(loc)} · <a href="#" data-v="open-map">Google Maps ${icon.external(11)}</a></div>`
+          : `<div class="muted small">No location yet. Search for a place or paste coordinates.</div>`}
+        </div>
+
+        <div class="v-section">
+          <div class="v-section-head">${icon.calendar(14)} Taken
+            <button class="linkish" data-v="edit-date">${p.edits.taken ? "Change" : "Set"}</button></div>
+          <div>${takenHtml}</div>
+        </div>
+
+        <div class="v-section">
+          <div class="v-section-head">${icon.rotateRight(14)} Rotate
+            <span class="v-rot">
+              <button class="v-btn small" data-v="rotate-left" title="Rotate left ([)">${icon.rotateLeft(15)}</button>
+              <button class="v-btn small" data-v="rotate-right" title="Rotate right (])">${icon.rotateRight(15)}</button>
+            </span></div>
+        </div>
+
         <dl class="facts">
           ${fact("Quality", p.info.quality === "FINE" ? "Fine" : p.info.quality === "STD" ? "Standard" : esc(p.info.quality))}
           ${fact("Size", `${p.info.width} × ${p.info.height}`)}
           ${fact("Shutter", p.info.shutter ? `${esc(p.info.shutter)} s` : "—")}
           ${fact("Flash", p.info.flash == null ? "—" : p.info.flash ? `${icon.flash(13)} fired` : "off")}
           ${fact("Sound", p.soundSeconds != null ? `${p.soundSeconds.toFixed(1)} s` : "none")}
-          ${fact("Taken", taken)}
           ${fact("File", `${esc(p.stem)}.PMP · ${fmtBytes(p.fileBytes)}`)}
           ${p.protected ? fact("Protected", "yes") : ""}
           ${!p.inIndex ? fact("Index", `<span class="warn-text">not listed in the album index — the camera won't show it</span>`) : ""}
@@ -383,10 +467,19 @@ function renderViewer() {
           <button class="btn" data-v="export">${icon.export(15)} Export…</button>
           <button class="btn" data-v="reveal">${icon.finder(15)} Show file</button>
         </div>
+        <div class="muted small v-keys">Pinch or ⌘+/⌘− to zoom · drag to pan · double-click to zoom · ← → next photo · Space plays sound</div>
       </aside>
     </div>`;
   el.classList.add("show");
-  if (p.wavPath) drawWave(p.wavPath);
+  const img = document.getElementById("v-img");
+  if (img) {
+    viewer.stage = new ZoomStage($("#v-stage"), img, p.info.width || 640, p.info.height || 480, p.edits.rotation ?? 0, zoom, zoomLabel);
+  }
+  if (loc) renderMap($("#v-map"), loc.lat, loc.lon, 14);
+  if (p.wavPath) {
+    drawWave(p.wavPath);
+    if (navigated && playback.auto) togglePlay();
+  }
 }
 
 const waveCache = new Map<string, Float32Array>();
@@ -415,7 +508,8 @@ async function drawWave(path: string) {
       return;
     }
   }
-  paintWave(canvas, peaks, 0);
+  const c = document.getElementById("wave") as HTMLCanvasElement | null;
+  if (c) paintWave(c, peaks, viewer.audio && viewer.audio.duration ? viewer.audio.currentTime / viewer.audio.duration : 0);
 }
 
 function paintWave(canvas: HTMLCanvasElement, peaks: Float32Array, progress: number) {
@@ -429,7 +523,7 @@ function paintWave(canvas: HTMLCanvasElement, peaks: Float32Array, progress: num
   const css = getComputedStyle(document.documentElement);
   for (let i = 0; i < peaks.length; i++) {
     const bh = Math.max(2, peaks[i] * (h - 4));
-    g.fillStyle = i / peaks.length < progress ? css.getPropertyValue("--accent") : css.getPropertyValue("--wave");
+    g.fillStyle = i / peaks.length < progress ? css.getPropertyValue("--accent") : "rgba(255,255,255,0.25)";
     g.fillRect(i * bw + 0.5, (h - bh) / 2, Math.max(1, bw - 1.5), bh);
   }
 }
@@ -441,10 +535,12 @@ function togglePlay() {
   if (viewer.audio && !viewer.audio.paused) {
     viewer.audio.pause();
     if (btn) btn.innerHTML = icon.play(22);
+    cancelAnimationFrame(viewer.raf);
     return;
   }
   if (!viewer.audio) {
     const a = new Audio(fileUrl(p.wavPath));
+    a.loop = playback.loop;
     viewer.audio = a;
     a.addEventListener("ended", () => {
       if (btn) btn.innerHTML = icon.play(22);
@@ -452,6 +548,8 @@ function togglePlay() {
       const c = document.getElementById("wave") as HTMLCanvasElement | null;
       const peaks = waveCache.get(p.wavPath!);
       if (c && peaks) paintWave(c, peaks, 0);
+      const t = document.getElementById("ptime");
+      if (t) t.textContent = "0:00";
       viewer.audio = null;
     });
   }
@@ -469,6 +567,15 @@ function togglePlay() {
   };
   cancelAnimationFrame(viewer.raf);
   tick();
+}
+
+async function rotate(d: Disc, ids: string[], by: number) {
+  try {
+    return await api.editPhotos(d.path, ids.map((photoId) => ({ photoId, rotateBy: by })));
+  } catch (e) {
+    toast(`Couldn't rotate: ${e}`, undefined, "error");
+    return null;
+  }
 }
 
 // ---------------------------------------------------------------- actions
@@ -596,33 +703,53 @@ document.addEventListener("click", async (e) => {
 
   if (el.dataset.v) {
     const p = viewer.list[viewer.index];
+    const vd = viewer.disc;
     switch (el.dataset.v) {
       case "close": closeViewer(); break;
-      case "prev": if (viewer.index > 0) { viewer.index--; renderViewer(); } break;
-      case "next": if (viewer.index < viewer.list.length - 1) { viewer.index++; renderViewer(); } break;
+      case "prev": go(-1); break;
+      case "next": go(1); break;
       case "play": togglePlay(); break;
-      case "export": if (viewer.disc && p) exportPhotos(viewer.disc, [p.id]); break;
+      case "zoom-reset": viewer.stage?.reset(); break;
+      case "export": if (vd && p) exportPhotos(vd, [p.id]); break;
       case "reveal": if (p) revealItemInDir(p.jpegPath ?? p.pmpPath); break;
+      case "edit-location": if (vd && p) openLocationEditor(vd, [p], viewerDiscUpdated); break;
+      case "edit-date": if (vd && p) openDateEditor(vd, [p], viewerDiscUpdated); break;
+      case "open-map": e.preventDefault(); if (p?.edits.location) openUrl(googleMapsUrl(p.edits.location)); break;
+      case "rotate-left":
+      case "rotate-right": {
+        if (!vd || !p) break;
+        const nd = await rotate(vd, [p.id], el.dataset.v === "rotate-left" ? -90 : 90);
+        if (nd) viewerDiscUpdated(nd);
+        break;
+      }
     }
     return;
   }
   if (el.dataset.nav === "camera") { state.view = { kind: "camera" }; state.selection.clear(); render(); return; }
-  if (el.dataset.disc) { state.view = { kind: "disc", path: el.dataset.disc }; state.selection.clear(); state.filter = "all"; render(); return; }
+  if (el.dataset.disc) { state.view = { kind: "disc", path: el.dataset.disc }; state.selection.clear(); state.anchor = null; state.filter = "all"; render(); return; }
   if (el.dataset.openDisc) { state.view = { kind: "disc", path: el.dataset.openDisc }; render(); return; }
   if (el.dataset.filter) { state.filter = el.dataset.filter as Filter; render(); return; }
-  if (el.dataset.select) {
+  const me = e as MouseEvent;
+  const pickId = el.dataset.select ?? el.dataset.photo;
+  if (pickId && d) {
     e.stopPropagation();
-    const id = el.dataset.select;
-    state.selection.has(id) ? state.selection.delete(id) : state.selection.add(id);
+    const list = visiblePhotos(d).map((p) => p.id);
+    if (me.shiftKey) {
+      // Range from the last photo clicked (or opened) to this one, added to the selection.
+      const a = list.indexOf(state.anchor ?? pickId);
+      const b = list.indexOf(pickId);
+      const [lo, hi] = a < 0 ? [b, b] : [Math.min(a, b), Math.max(a, b)];
+      list.slice(lo, hi + 1).forEach((id) => state.selection.add(id));
+      document.getSelection()?.removeAllRanges();
+    } else if (el.dataset.select || me.metaKey || me.ctrlKey || state.selection.size) {
+      state.selection.has(pickId) ? state.selection.delete(pickId) : state.selection.add(pickId);
+      state.anchor = pickId;
+    } else {
+      openViewer(d, pickId);
+      return;
+    }
+    state.anchor = me.shiftKey ? state.anchor ?? pickId : pickId;
     render();
-    return;
-  }
-  if (el.dataset.photo && d) {
-    if ((e as MouseEvent).metaKey || (e as MouseEvent).ctrlKey || state.selection.size) {
-      const id = el.dataset.photo;
-      state.selection.has(id) ? state.selection.delete(id) : state.selection.add(id);
-      render();
-    } else openViewer(d, el.dataset.photo);
     return;
   }
 
@@ -666,12 +793,35 @@ document.addEventListener("click", async (e) => {
     case "rename": state.renaming = true; render(); break;
     case "export": if (d) exportPhotos(d, state.selection.size ? [...state.selection] : d.albums.flatMap((a) => a.photos.map((p) => p.id))); break;
     case "clear-selection": state.selection.clear(); render(); break;
+    case "sel-location": if (d) openLocationEditor(d, selectedPhotos(d), (nd) => { updateDisc(nd); render(); }); break;
+    case "sel-date": if (d) openDateEditor(d, selectedPhotos(d), (nd) => { updateDisc(nd); render(); }); break;
+    case "sel-rotate-left":
+    case "sel-rotate-right": {
+      if (!d) break;
+      const nd = await rotate(d, [...state.selection], el.dataset.action === "sel-rotate-left" ? -90 : 90);
+      if (nd) { updateDisc(nd); render(); }
+      break;
+    }
     case "select-all": if (d) { visiblePhotos(d).forEach((p) => state.selection.add(p.id)); render(); } break;
   }
 });
 
+function selectedPhotos(d: Disc): Photo[] {
+  return d.albums.flatMap((a) => a.photos).filter((p) => state.selection.has(p.id));
+}
+
 document.addEventListener("change", (e) => {
   const t = e.target as HTMLInputElement;
+  if (t.dataset.pref === "autoplay") {
+    playback.auto = t.checked;
+    prefs.set("autoplay", t.checked);
+    if (t.checked && !viewer.audio) togglePlay();
+  }
+  if (t.dataset.pref === "loop") {
+    playback.loop = t.checked;
+    prefs.set("loop", t.checked);
+    if (viewer.audio) viewer.audio.loop = t.checked;
+  }
   if (t.id === "port-select") state.port = t.value;
   if (t.name === "imode") { state.importMode = t.value as "update" | "new"; render(); }
 });
@@ -687,18 +837,44 @@ document.addEventListener("input", (e) => {
 });
 
 document.addEventListener("keydown", (e) => {
+  if (document.querySelector(".modal-back")) return; // a sheet is open; it handles its own keys
+  const typing = (e.target as HTMLElement).matches?.("input, textarea, select");
   if (!viewer.open) {
     if (e.key === "Enter" && (e.target as HTMLElement).classList?.contains("tile")) {
       const d = currentDisc();
       const id = (e.target as HTMLElement).dataset.photo;
       if (d && id) openViewer(d, id);
     }
+    if (e.key === "Escape" && state.selection.size) { state.selection.clear(); render(); }
+    if ((e.metaKey || e.ctrlKey) && e.key === "a" && !typing && currentDisc()) {
+      e.preventDefault();
+      visiblePhotos(currentDisc()!).forEach((p) => state.selection.add(p.id));
+      render();
+    }
     return;
   }
+  if (typing) return;
+  const z = viewer.stage;
   if (e.key === "Escape") closeViewer();
-  else if (e.key === "ArrowLeft" && viewer.index > 0) { viewer.index--; renderViewer(); }
-  else if (e.key === "ArrowRight" && viewer.index < viewer.list.length - 1) { viewer.index++; renderViewer(); }
+  else if (e.key === "ArrowLeft") go(-1);
+  else if (e.key === "ArrowRight") go(1);
   else if (e.key === " ") { e.preventDefault(); togglePlay(); }
+  else if (e.key === "+" || e.key === "=") { e.preventDefault(); z?.zoomBy(1.25); }
+  else if (e.key === "-") { e.preventDefault(); z?.zoomBy(0.8); }
+  else if (e.key === "0") { e.preventDefault(); z?.reset(); }
+  else if (e.key === "[" || e.key === "]") document.querySelector<HTMLButtonElement>(`[data-v="${e.key === "[" ? "rotate-left" : "rotate-right"}"]`)?.click();
+});
+
+// Window dragging: the toolbar, the sidebar's top strip and the viewer's top bar move the
+// window (the title bar is hidden on macOS); double-click zooms it like a title bar.
+document.addEventListener("mousedown", (e) => {
+  if (e.button !== 0) return;
+  const t = e.target as HTMLElement;
+  if (!t.closest("[data-drag]") || t.closest("button, input, select, textarea, a, label, .seg, .disc-name")) return;
+  e.preventDefault();
+  const w = getCurrentWindow();
+  if (e.detail === 2) w.toggleMaximize();
+  else w.startDragging();
 });
 
 // Keep the camera awake and the status fresh; notice when it is switched off.
