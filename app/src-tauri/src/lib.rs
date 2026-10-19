@@ -591,6 +591,18 @@ async fn map_tile(app: AppHandle, z: u32, x: u32, y: u32) -> Result<tauri::ipc::
     .map_err(err)?
 }
 
+/// Self-test: with MD1_DIAG=1 the frontend checks binary IPC, photo decoding, map tiles and asset
+/// fetches from inside the real web view and reports here (see app/README.md).
+#[tauri::command]
+fn diag_enabled() -> bool {
+    std::env::var("MD1_DIAG").is_ok()
+}
+
+#[tauri::command]
+fn diag_report(text: String) {
+    eprintln!("DIAG {text}");
+}
+
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
@@ -644,6 +656,8 @@ pub fn run() {
             reverse_geocode,
             map_tile,
             expand_url,
+            diag_enabled,
+            diag_report,
         ])
         .run(tauri::generate_context!())
         .expect("error while running MD1 Studio");

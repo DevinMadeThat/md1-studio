@@ -1,3 +1,4 @@
+import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open } from "@tauri-apps/plugin-dialog";
@@ -557,7 +558,8 @@ async function drawWave(path: string) {
   let peaks = waveCache.get(path);
   if (!peaks) {
     try {
-      const buf = await (await fetch(fileUrl(path))).arrayBuffer();
+      const bytes = await api.readDiscFile(path);
+      const buf = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer;
       const ctx = new OfflineAudioContext(1, 1, 44100);
       const audio = await ctx.decodeAudioData(buf);
       const data = audio.getChannelData(0);
@@ -1043,6 +1045,29 @@ async function init() {
   await Promise.all([refreshDiscs(), refreshPorts()]);
   if (state.discs.length) state.view = { kind: "disc", path: state.discs[0].path };
   render();
+  if (await invoke<boolean>("diag_enabled")) runDiag();
+}
+
+async function runDiag() {
+  const out: string[] = [];
+  const say = (s: string) => out.push(s);
+  const p = state.discs.flatMap((d) => d.albums.flatMap((a) => a.photos)).find((x) => x.jpegPath);
+  if (!p) return invoke("diag_report", { text: "no photo" });
+  try {
+    const r: any = await invoke("read_disc_file", { path: p.jpegPath });
+    say(`read_disc_file -> ${Object.prototype.toString.call(r)} len=${r?.byteLength ?? r?.length}`);
+    const bm = await createImageBitmap(new Blob([r instanceof ArrayBuffer ? r : new Uint8Array(r)], { type: "image/jpeg" }));
+    say(`bitmap ${bm.width}x${bm.height}`);
+  } catch (e) { say(`read/decode error ${e}`); }
+  try {
+    const r: any = await invoke("map_tile", { z: 2, x: 1, y: 1 });
+    say(`map_tile -> ${Object.prototype.toString.call(r)} len=${r?.byteLength ?? r?.length}`);
+  } catch (e) { say(`map_tile error ${e}`); }
+  try {
+    const f = await fetch(fileUrl(p.jpegPath!));
+    say(`fetch asset -> ${f.status} ${(await f.arrayBuffer()).byteLength}`);
+  } catch (e) { say(`fetch asset error ${e}`); }
+  await invoke("diag_report", { text: out.join(" | ") });
 }
 
 init().catch((e) => {

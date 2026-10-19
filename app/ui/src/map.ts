@@ -8,7 +8,7 @@ function tileUrl(z: number, x: number, y: number): Promise<string> {
   const key = `${z}/${x}/${y}`;
   let p = tileCache.get(key);
   if (!p) {
-    p = api.mapTile(z, x, y).then((buf) => URL.createObjectURL(new Blob([buf], { type: "image/png" })));
+    p = api.mapTile(z, x, y).then((bytes) => URL.createObjectURL(new Blob([bytes as BlobPart], { type: "image/png" })));
     p.catch(() => tileCache.delete(key));
     tileCache.set(key, p);
   }

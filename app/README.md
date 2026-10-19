@@ -121,6 +121,18 @@ In the app, choose "Enter a port path by hand" and type the `/dev/ttys…` path.
 starts at 9600 baud with its frame sequence mid-way (like the real one), serves the mirror with
 the real camera's reply layouts, and `--allow-writes` applies writes to a temporary copy.
 
+### Self-test inside the real app
+
+The UI harness used during development mocks Tauri's IPC, so it can't catch problems in the real
+web view (that's how a too-strict Content-Security-Policy once broke the editor). Run the
+built app with `MD1_DIAG=1` to have it check, from inside the web view, that binary IPC
+results arrive as `ArrayBuffer`s, that a photo decodes, that map tiles load, and that asset
+URLs can be fetched; results are printed to stderr as `DIAG …`:
+
+```sh
+MD1_DIAG=1 "target/release/bundle/macos/MD1 Studio.app/Contents/MacOS/md1-studio"
+```
+
 ## Where things are stored
 
 * Library (default): `~/Pictures/MD1 Studio/<disc name>/` — same layout as `md1tool`

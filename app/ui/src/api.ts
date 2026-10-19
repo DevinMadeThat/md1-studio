@@ -192,7 +192,15 @@ export const api = {
   geocode: (query: string) => invoke<Place[]>("geocode", { query }),
   reverseGeocode: (lat: number, lon: number) => invoke<string | null>("reverse_geocode", { lat, lon }),
   expandUrl: (url: string) => invoke<string>("expand_url", { url }),
-  mapTile: (z: number, x: number, y: number) => invoke<ArrayBuffer>("map_tile", { z, x, y }),
+  mapTile: (z: number, x: number, y: number) =>
+    invoke<ArrayBuffer | number[]>("map_tile", { z, x, y }).then(asBytes),
+  readDiscFile: (path: string) => invoke<ArrayBuffer | number[]>("read_disc_file", { path }).then(asBytes),
 };
 
 export const fileUrl = (path: string) => convertFileSrc(path);
+
+/** Binary command results arrive as an ArrayBuffer over Tauri's IPC protocol, but as a plain
+ * number array if the app falls back to its message channel; accept both. */
+export function asBytes(r: ArrayBuffer | Uint8Array | number[]): Uint8Array {
+  return r instanceof ArrayBuffer ? new Uint8Array(r) : r instanceof Uint8Array ? r : Uint8Array.from(r);
+}

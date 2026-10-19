@@ -1,7 +1,6 @@
 // Live-preview version of crates/md1-core/src/adjust.rs: noise cleanup → colour → geometry.
 // The formulas must stay identical to the Rust ones (exports are rendered there).
-import { invoke } from "@tauri-apps/api/core";
-import type { Photo, PhotoEdits } from "./api";
+import { api, type Photo, type PhotoEdits } from "./api";
 
 export interface Crop { x: number; y: number; w: number; h: number }
 export interface AutoLevels { lo: number[]; hi: number[]; gamma: number }
@@ -125,7 +124,7 @@ const bitmaps = new Map<string, Promise<ImageBitmap>>();
 export function loadBitmap(path: string): Promise<ImageBitmap> {
   let p = bitmaps.get(path);
   if (!p) {
-    p = invoke<ArrayBuffer>("read_disc_file", { path }).then((buf) => createImageBitmap(new Blob([buf], { type: "image/jpeg" })));
+    p = api.readDiscFile(path).then((bytes) => createImageBitmap(new Blob([bytes as BlobPart], { type: "image/jpeg" })));
     p.catch(() => bitmaps.delete(path));
     bitmaps.set(path, p);
   }
