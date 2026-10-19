@@ -14,3 +14,7 @@ own licences (MIT / Apache-2.0 for Tauri and the crates used).
 
 Sony, Cyber-shot and MiniDisc are trademarks of Sony Group Corporation. This project is not
 affiliated with or endorsed by Sony. No Sony software or documentation is included.
+
+docs/images/dsc-md1.jpg is "Sony CyberShot DSC-MD1 CP+ 2011" by Morio (Wikimedia Commons),
+CC BY-SA 3.0, resized. The sample photos in docs/images/screenshot-*.jpg are public domain or
+CC0; see docs/images/CREDITS.md.

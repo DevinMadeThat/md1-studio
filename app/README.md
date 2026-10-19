@@ -7,6 +7,8 @@ alongside them. Built with Tauri 2 (Rust + web UI) for macOS, Windows and Linux.
 Everything it relies on is documented in [`../docs/`](../docs/README.md); the protocol code
 mirrors `md1tool/md1.py`, which was proven on a real camera.
 
+![The camera screen: connected over USB-serial at 115,200 baud, ready to import](../docs/images/screenshot-camera.jpg)
+
 ## What it does (v0.1)
 
 * **Connect**: lists serial ports (USB-serial adapters first), finds the camera at 9600 or
@@ -95,8 +97,10 @@ npm run tauri build      # release: src-tauri/../target/release/bundle/{macos,dm
 cargo test -p md1-core -p atrac1
 ```
 
-Windows and Linux builds: `../.github/workflows/build.yml` (tauri-action) builds all platforms on
-a tag push. Locally, build each OS on that OS.
+`../.github/workflows/build.yml` (tauri-action) builds every platform: pushing a `v*` tag makes a
+draft GitHub release with the installers; running the workflow by hand ("Run workflow" on the
+Actions tab) builds them as downloadable artifacts without a release. Locally, build each OS on
+that OS. Per-OS prerequisites are in the [top-level README](../README.md#build-from-source).
 
 ### Platform notes
 
@@ -106,8 +110,10 @@ a tag push. Locally, build each OS on that OS.
 | Windows | `COM3` etc. | FTDI driver comes from Windows Update. Uses the `serialport` crate. |
 | Linux | `/dev/ttyUSB0` | User must be in the `dialout` (or `uucp`) group. termios. |
 
-The unsigned macOS build opens with right-click → Open the first time (or sign/notarize it with
-an Apple Developer ID; see Tauri's docs).
+The builds aren't signed. On macOS, the first launch needs System Settings → Privacy & Security →
+Open Anyway (or `xattr -dr com.apple.quarantine "/Applications/MD1 Studio.app"`); on Windows,
+SmartScreen's More info → Run anyway. Signing needs an Apple Developer ID / a Windows code-signing
+certificate; tauri-action picks them up from repository secrets (see Tauri's docs).
 
 ## Testing without the camera
 

@@ -15,7 +15,7 @@ manual are not included in this repository; links are given where they are publi
 
 ## Community
 
-* Post by **@defor** on X noting that the DSC-MD1 is fully supported by DSC Utility 1.5a, with
+* Post by **@defor** on X (2025-05-08) noting that the DSC-MD1 is fully supported by DSC Utility 1.5a, with
   the archive link: <https://x.com/defor/status/1920659851731980567>.
 * **MiniDisc Community Page** (minidisc.org): Sony DSC-MD1 product page, with specs and
   history.
@@ -30,6 +30,7 @@ manual are not included in this repository; links are given where they are publi
 
 ## Hardware that worked
 
-* A USB-to-RS232 adapter with an FTDI FT232R chip and a male DB9 (sold as "OIKWAN USB to RS232").
-* A "DB9 9-pin female to 3.5 mm male plug RS232 cable" (sold as "Qaoquda"). Works as bought;
-  no null modem.
+* A USB-to-RS232 adapter with an FTDI FT232R chip and a male DB9:
+  [OIKWAN USB to RS232](https://www.amazon.com/dp/B0759HSLP1).
+* A "DB9 9-pin female to 3.5 mm male plug RS232 cable":
+  [Qaoquda DB9 to 3.5 mm](https://www.amazon.com/dp/B06WLP4LTP). Works as bought; no null modem.

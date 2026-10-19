@@ -9,10 +9,15 @@ DSC-MD1 "DIGITAL I/O" jack (3.5 mm TRS, RS-232C)
              └─ USB-A → USB-C adapter → MacBook (macOS 15, Apple Silicon)
 ```
 
+Parts: [OIKWAN USB to RS232 (FTDI)](https://www.amazon.com/dp/B0759HSLP1) and
+[Qaoquda DB9 female to 3.5 mm cable](https://www.amazon.com/dp/B06WLP4LTP).
+
 * macOS uses its built-in FTDI driver; the port appears as `/dev/cu.usbserial-<serial>`
   (the suffix is the adapter's serial number). Nothing to install.
 * No null-modem adapter was needed: the cheap TRS cable's TX/RX happen to match the camera.
-* Linux (`/dev/ttyUSB0`) and Windows (COMn) should work the same with pyserial; untested.
+* Linux (`/dev/ttyUSB0`, user in the `dialout`/`uucp` group) and Windows (`COMn`, FTDI driver
+  from Windows Update) should work the same; untested with a real camera so far. Per-OS install
+  steps are in the [top-level README](../README.md#install).
 
 ## Camera preparation
 
