@@ -37,7 +37,7 @@ pub struct CameraPhoto {
     pub sound_size: Option<u32>,
     pub sound_seconds: Option<f64>,
     pub protected: bool,
-    /// Quarter turns clockwise stored in the album index (record byte 5 bits 2–3).
+    /// How the camera shows the photo turned, in quarter turns clockwise (album index).
     pub rotation: u8,
     /// Listed in the album index (the camera shows only indexed photos).
     pub in_index: bool,
@@ -207,7 +207,7 @@ pub fn photos_from(tree: &[(String, DirEntry)], files: &HashMap<String, Vec<u8>>
 
         let mut numbers: Vec<(u16, bool, bool, u8)> = Vec::new(); // number, indexed, protected, rotation
         if let Some(ix) = &index {
-            numbers.extend(ix.records.iter().map(|r| (r.number, true, r.protected, (r.flags[0] >> 2) & 3)));
+            numbers.extend(ix.records.iter().map(|r| (r.number, true, r.protected, r.rotation_cw())));
         }
         let mut extra: Vec<u16> = tree
             .iter()

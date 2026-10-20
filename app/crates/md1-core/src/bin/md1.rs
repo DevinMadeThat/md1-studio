@@ -9,7 +9,8 @@
 //!   md1 get     PORT DISC_DIR PSN_PATH...      (chosen photos + their sound + index files)
 //!   md1 scan    DISC_DIR            (JSON of albums and photos)
 //!   md1 add     PORT ALBUM IMAGE [fine] [fill]   (WRITES: add any picture to the album)
-//!   md1 mark    PORT ALBUM POSITION rotate N | protect on|off   (WRITES the album index)
+//!   md1 mark    PORT ALBUM POSITION rotate N | protect on|off   (WRITES the album index;
+//!                                               N = quarter turns clockwise as shown, 0–3)
 //!   md1 try     PORT HEX...         (03 01 / 03 03 with parameters; status before and after)
 //!   md1 wav     FILE.PMA OUT.wav
 //!   md1 export  DISC_DIR OUT_DIR [SCALE]

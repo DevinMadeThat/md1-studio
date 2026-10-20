@@ -222,6 +222,7 @@ pub fn import_disc(
     let mut failed = Vec::new();
     let mut meta = DiscMeta::load(disc_dir).unwrap_or_default();
     let now = now_utc_iso();
+    let mut new_ids: Vec<String> = Vec::new();
     for (i, (path, e)) in todo.iter().enumerate() {
         on_event(ImportEvent::File { index: i + 1, count: todo.len(), path: path.clone(), size: e.size })?;
         if let Some(data) = browsed.and_then(|b| b.files.get(path)).filter(|d| d.len() == e.size as usize) {
@@ -258,6 +259,9 @@ pub fn import_disc(
                 store(disc_dir, path, &data, &stamp)?;
                 done += e.size as u64;
                 if let Some(id) = photo_id(path) {
+                    if !meta.photo_imports.contains_key(&id) {
+                        new_ids.push(id.clone());
+                    }
                     meta.photo_imports.entry(id).or_insert_with(|| now.clone());
                     // Saved as we go, so a cancelled import still knows when its photos arrived.
                     meta.save(disc_dir)?;
@@ -273,6 +277,7 @@ pub fn import_disc(
 
     on_event(ImportEvent::Converting)?;
     convert_disc(disc_dir)?;
+    adopt_camera_rotation(disc_dir, &new_ids)?;
     write_manifest(disc_dir)?;
 
     if meta.name.is_empty() || !opts.name.is_empty() {
@@ -297,6 +302,29 @@ pub fn import_disc(
     } else {
         Err(Error::Protocol(format!("{} file(s) could not be read: {}", failed.len(), failed.join(", "))))
     }
+}
+
+/// Photos turned on the camera (album index) start out turned the same way in the library,
+/// unless the user has already edited them.
+fn adopt_camera_rotation(disc_dir: &Path, ids: &[String]) -> Result<(), Error> {
+    let have = crate::edits::load(disc_dir);
+    let mut patches = Vec::new();
+    for id in ids {
+        let Some((album, stem)) = id.split_once('/') else { continue };
+        let Ok(n) = stem.trim_start_matches("PSN").parse::<u16>() else { continue };
+        let index = fs::read(disc_dir.join("disc/PIC_MD").join(album).join("PIC_INF.PMF")).ok();
+        let Some(rec) = index.as_deref().and_then(formats::parse_pic_inf).and_then(|ix| ix.records.into_iter().find(|r| r.number == n)) else {
+            continue;
+        };
+        if rec.rotation_cw() != 0 && !have.contains_key(id) {
+            let patch = crate::edits::EditPatch { rotate_by: Some(rec.rotation_cw() as i32 * 90), ..Default::default() };
+            patches.push((id.clone(), patch));
+        }
+    }
+    if !patches.is_empty() {
+        crate::edits::apply(disc_dir, &patches).map_err(Error::Protocol)?;
+    }
+    Ok(())
 }
 
 /// "/PIC_MD/PIC00001/PSN00018.PMP" → "PIC00001/PSN00018"

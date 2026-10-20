@@ -207,15 +207,17 @@ impl Album {
         Ok(&mut self.pic_inf[at..at + 16])
     }
 
-    /// Quarter turns clockwise (0–3) in record byte 5 bits 2–3, where Sony's software keeps
-    /// rotation. Whether the MD1 honours it is what docs/next-steps.md tracks.
-    pub fn set_rotation(&mut self, position: usize, quarters: u8) -> Result<(), Error> {
+    /// Show the photo turned `quarters_cw` quarter turns clockwise. The record (byte 5 bits 2–3)
+    /// counts counter-clockwise quarter turns; the camera honours it (confirmed 2026-10-19).
+    pub fn set_rotation(&mut self, position: usize, quarters_cw: u8) -> Result<(), Error> {
         let r = self.record(position)?;
-        r[5] = (r[5] & !0x0C) | ((quarters & 3) << 2);
+        let ccw = (4 - (quarters_cw & 3)) % 4;
+        r[5] = (r[5] & !0x0C) | (ccw << 2);
         Ok(())
     }
 
-    /// Protect flag: record byte 14 bit 0 (Sony's software skips these when deleting).
+    /// Protect flag: record byte 14 bit 0. The camera shows no mark, but refuses to delete the
+    /// photo (confirmed 2026-10-19); Sony's software skips these when deleting.
     pub fn set_protected(&mut self, position: usize, on: bool) -> Result<(), Error> {
         let r = self.record(position)?;
         r[14] = (r[14] & !1) | on as u8;
@@ -304,6 +306,25 @@ mod tests {
         assert_eq!([j[sof + 10], j[sof + 13], j[sof + 16]], [0, 1, 2], "component ids like the camera's");
         let decoded = crate::adjust::decode_jpeg(j).unwrap();
         assert_eq!(decoded.dimensions(), (640, 480));
+    }
+
+    #[test]
+    fn rotation_is_stored_counter_clockwise() {
+        let mut pic_inf = vec![0u8; PIC_INF_RECORDS + 16];
+        pic_inf[..4].copy_from_slice(&[0x10, 0x12, 0x01, 0x00]);
+        for o in PIC_INF_COUNTS {
+            pic_inf[o + 1] = 1;
+        }
+        let mut album = Album { name: "PIC00001".into(), pic_inf, pidx: vec![0; PMX_BLOCK], ov_inf: vec![0; 0x130] };
+        // On the camera, stored value 1 showed the photo turned 90° counter-clockwise.
+        album.set_rotation(0, 3).unwrap();
+        assert_eq!(album.pic_inf[PIC_INF_RECORDS + 5] & 0x0C, 1 << 2);
+        album.set_rotation(0, 1).unwrap();
+        assert_eq!(album.pic_inf[PIC_INF_RECORDS + 5] & 0x0C, 3 << 2);
+        let rec = &formats::parse_pic_inf(&album.pic_inf).unwrap().records[0];
+        assert_eq!(rec.rotation_cw(), 1);
+        album.set_protected(0, true).unwrap();
+        assert!(formats::parse_pic_inf(&album.pic_inf).unwrap().records[0].protected);
     }
 
     #[test]

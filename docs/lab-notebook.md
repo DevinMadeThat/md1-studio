@@ -197,5 +197,10 @@ Disc 2 (restored + `PSN00019`, 20 photos) in the camera, on battery (power 4). T
   code), photo 2 record byte 14 bit 0 (protect). Read back identical.
 * Correction: `OV_INF.PMF` holds the album number at **0x120** (0001 on disc 2, 0000 on the
   camera-formatted disc), not 0x122.
-* **To check on the camera after a power cycle** (owner): does photo 21 appear and display?
-  Is photo 1 shown rotated, and which way? Does photo 2 show a protect mark?
+* **Owner's check after a power cycle:** photo 21 (the uploaded picture) appears and displays.
+  Photo 1 is shown turned **counter-clockwise**, so the rotation bits count counter-clockwise
+  quarter turns (the app now writes and reads them that way). Photo 2 shows **no protect mark**,
+  but the camera's delete button refuses it: choosing the first delete option gives a message
+  in red, while an unprotected photo offers two options. So byte 14 bit 0 is the protect flag.
+* Library imports now start a photo turned the way the camera shows it (unless it was already
+  edited in the library).

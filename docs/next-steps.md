@@ -64,8 +64,8 @@ chosen photos, one library grouped by import day, matching of camera photos to t
 |---|---|
 | "Open Camera": camera image list with thumbnails; copy selected images to an album | Done (thumbnail browser, download chosen photos, "In library" marks) |
 | Export images as BMP / JPEG (quality 1–100) / TIFF | JPEG (with EXIF/XMP), PNG, TIFF; 1–3× |
-| Image info: **protect**, **caption** (14 chars) and edited date, written back to the camera | Protect: written to the camera (display to be confirmed). Captions and dates stay in the library: the MD1's headers carry tag 0x11, not ALBUM's 0x12 caption, and the camera has no way to show text |
-| Rotate 90°/180°, stored in PIC_INF byte 5 | Written to the camera (display and direction to be confirmed) |
+| Image info: **protect**, **caption** (14 chars) and edited date, written back to the camera | Protect: written to the camera (confirmed: the camera refuses to delete it; it shows no mark). Captions and dates stay in the library: the MD1's headers carry tag 0x11, not ALBUM's 0x12 caption, and the camera has no way to show text |
+| Rotate 90°/180°, stored in PIC_INF byte 5 | Written to the camera (confirmed; bits 2–3 count counter-clockwise turns); imports start out turned the same way |
 | **Copy To Camera**: any BMP/JPEG, fitted to 640 × 480, Fine or Snapshot | Done (`author.rs`): JPEG/PNG/TIFF/BMP/GIF/WebP or library photos with edits; fit or fill; standard or fine |
 | **Delete** pictures on the camera (`02 15`), skipping protected ones | Deliberately refused |
 | Albums with titles; new / rename / delete; **set album cover** | Library albums with covers (rename, delete, add/remove). Camera-side albums (`PIC0000n` + OV_INF titles) not written |

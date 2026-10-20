@@ -113,10 +113,12 @@ File sizes: Standard ≈ 60–64 KB, Fine ≈ 106–128 KB (the camera budgets 6
 | 0–1 | `00 01` | Album number (PIC00001) |
 | 2–3 | `00 12` | Picture number → `PSN00018.PMP` |
 | 4 | `01` | Always 01 so far |
-| 5–6 | `00 00` | Flags (protect / bookmarks / rotation — not yet observed set) |
+| 5 | `00` | Flags. **Bits 2–3 = rotation, in quarter turns counter-clockwise** (confirmed 2026-10-19: `04` makes the camera show the photo turned 90° counter-clockwise) |
+| 6 | `00` | Flags (unknown) |
 | 7 | `00` / **`01`** | **Has sound** — `01` exactly when `NRAnnnnn.PMA` exists (photo 18 on disc 2) |
 | 8–13 | `FF FF FF FF FF FF` | Unused / title link? |
-| 14–15 | `00 00` | |
+| 14 | `00` | **Bit 0 = protect** (confirmed 2026-10-19: the camera shows no mark, but its delete menu refuses the photo with a red message) |
+| 15 | `00` | |
 
 * So the index *does* flag sound, but never names the file; the file is `NRA` + the same
   5-digit number as the photo.

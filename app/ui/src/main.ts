@@ -412,12 +412,12 @@ function camStrip(cam: CameraInfo) {
 function camTile(p: CameraPhoto, inLib: boolean) {
   const sel = state.cam.selection.has(p.id);
   return `<div class="tile cam-tile ${sel ? "selected" : ""} ${inLib ? "in-lib" : ""}" data-cam="${esc(p.id)}" data-cam-path="${esc(p.path)}" tabindex="0">
-    ${p.thumb ? `<img src="${p.thumb}" alt="${esc(p.stem)}" draggable="false">` : `<div class="noimg">no thumbnail</div>`}
+    ${p.thumb ? `<img src="${p.thumb}" alt="${esc(p.stem)}" draggable="false" class="rot${p.rotation * 90}">` : `<div class="noimg">no thumbnail</div>`}
     <button class="tile-check" data-cam-select="${esc(p.id)}" title="Select">${icon.check(13)}</button>
     <span class="lib-badge" title="Already in your library">${icon.check(11)} In library</span>
     <div class="tile-badges">
-      ${p.rotation ? `<span class="badge plain" title="Rotated on the camera">${icon.rotateRight(11)} ${p.rotation * 90}°</span>` : ""}
-      ${p.protected ? `<span class="badge plain" title="Protected on the camera">${icon.lock(11)}</span>` : ""}
+      ${p.rotation ? `<span class="badge plain" title="Turned on the camera">${p.rotation === 3 ? `${icon.rotateLeft(11)} 90°` : `${icon.rotateRight(11)} ${p.rotation * 90}°`}</span>` : ""}
+      ${p.protected ? `<span class="badge plain" title="Protected: the camera won't delete it (it shows no mark for this)">${icon.lock(11)}</span>` : ""}
       ${p.soundSeconds != null ? `<span class="badge sound" title="Has sound (${p.soundSeconds.toFixed(1)} s)">${icon.sound(12)}</span>` : ""}
       ${p.quality === "FINE" ? `<span class="badge">FINE</span>` : ""}
       ${!p.inIndex ? `<span class="badge warn" title="Not in the camera's album index">hidden</span>` : ""}

@@ -166,6 +166,15 @@ pub struct PictureRecord {
     pub raw: [u8; 16],
 }
 
+impl PictureRecord {
+    /// How the camera shows the photo turned, in quarter turns clockwise. Stored in byte 5 bits
+    /// 2–3 as quarter turns counter-clockwise (confirmed on the camera 2026-10-19: value 1 shows
+    /// the photo turned 90° counter-clockwise).
+    pub fn rotation_cw(&self) -> u8 {
+        (4 - ((self.flags[0] >> 2) & 3)) % 4
+    }
+}
+
 #[derive(Debug, Clone, Serialize)]
 pub struct AlbumIndex {
     pub count: u16,

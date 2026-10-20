@@ -180,7 +180,7 @@ export interface CameraPhoto {
   soundSize: number | null;
   soundSeconds: number | null;
   protected: boolean;
-  /** Quarter turns clockwise stored in the camera's album index. */
+  /** How the camera shows the photo turned, in quarter turns clockwise. */
   rotation: number;
   inIndex: boolean;
   quality: "FINE" | "STD";

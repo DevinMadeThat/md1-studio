@@ -70,8 +70,10 @@ mirrors `md1tool/md1.py`, which was proven on a real camera.
     in the camera's own layout (no APPn, tables before the frame header, component ids 0/1/2)
     with a synthesized PMP header, an 80 × 64 thumbnail block, and the album index and album
     list updated. Proven on the hardware 2026-10-19 (docs/lab-notebook.md §16).
-  * *Rotate / protect*: PIC_INF record byte 5 bits 2–3 and byte 14 bit 0, where Sony's software
-    keeps them.
+  * *Rotate / protect*: PIC_INF record byte 5 bits 2–3 (counter-clockwise quarter turns) and
+    byte 14 bit 0, where Sony's software keeps them. Both confirmed on the camera: it shows the
+    turn, and refuses to delete a protected photo (it shows no mark for protection). Photos
+    turned on the camera start out turned the same way when imported.
   * The album is edited only if it matches the layout we've proven (counts agree, one thumbnail
     block per photo, a single album on the disc); every file is read back and compared; the
     files the app writes are the photo first, then the indexes.
