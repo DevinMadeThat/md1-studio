@@ -10,8 +10,9 @@ Sources analysed (all static, no hardware):
 
 Notation:
 
-* `segN:dddd` = byte offset (decimal) inside NE segment N of ALBUM, as printed by
-  `scratchpad/re/rdis.py` (that tool resolves NE relocations, so far calls show their real target).
+* `segN:dddd` = byte offset (decimal) inside NE segment N of ALBUM, from a small 16-bit x86
+  disassembler that resolves NE relocations, so far calls show their real target (any NE-aware
+  disassembler gives the same offsets).
 * `mac:0xNNNNN` = file offset in the MAC PEF data fork.
 * **reply data** = the bytes after the 3-byte `cmd1 cmd2 status` echo (ALBUM keeps the status at `DS:24B9` and a
   far pointer to the reply data at `DS:24BA`). All multi-byte protocol integers are **big-endian**.

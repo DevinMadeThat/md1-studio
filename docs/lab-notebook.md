@@ -141,7 +141,7 @@ effect**; the screen stayed on "PC" + three Japanese characters. Purpose remains
   `/PIC_MD/PIC00001/PSN00019.PMP`, appended a PIL-generated 80×60(+4) thumbnail block to
   `PIDX000.PMX`, appended a record + bumped counts in `PIC_INF.PMF`, bumped both counts in
   `OV_INF.PMF`. All four files verified by read-back.
-* After a power cycle the owner confirmed **photo #20 (the laptop) shows, and its thumbnail
+* After a power cycle the owner confirmed **photo #20 (the uploaded test picture) shows, and its thumbnail
   appears in the index view.**
 
 ## State at end of session (2026-10-18 ≈18:50)
