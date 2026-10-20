@@ -45,6 +45,8 @@ jobs:
             args: ""
             targets: ""
     runs-on: ${{ matrix.os }}
+    permissions:
+      contents: write # create the draft release and upload the installers
     defaults: { run: { working-directory: app } }
     steps:
       - uses: actions/checkout@v4
