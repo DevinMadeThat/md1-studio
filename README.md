@@ -49,13 +49,21 @@ over its serial port and provides:
 * Or **back up the whole disc** byte for byte (every file, including the index files), so it
   can be restored later.
 * Decodes the camera's **sound recordings** (mono ATRAC1) to WAV.
-* **Read-only by design.** The app never writes to the disc, and it refuses to send the
-  firmware's format and delete commands at all (see [Be careful with your disc](#be-careful-with-your-disc)).
+* **Safe by design.** Downloading only ever reads. The app refuses to send the firmware's
+  format and delete commands at all (see [Be careful with your disc](#be-careful-with-your-disc)).
+
+**Putting pictures on the camera** (asks first; every file written is read back to check it)
+* **Send any picture to the camera**: library photos (with your edits) or JPEG, PNG, TIFF, BMP,
+  GIF and WebP files, fitted or cropped to 640 × 480 at standard or fine quality, added to the
+  end of the album like photos the camera took.
+* **Rotate or protect photos on the camera**, in the camera's own album index.
 
 **Browsing**
-* **One library** of every photo you've downloaded, grouped by the day you imported it, with
-  badges for sound, place, caption and FINE quality. Filter by favourites, sound or quality.
-  Each disc is also listed on its own.
+* **One library** of every photo you've downloaded, like Lightroom or Apple Photos: All Photos,
+  Favourites and each **Import** by date, with badges for sound, place, caption and FINE quality.
+  Filter by favourites, sound or quality, or **search** captions, places and dates.
+* **Albums** you make yourself, with a cover photo.
+* **Slideshow with sound**: each photo stays up while its recorded sound plays.
 * A full-screen viewer with keyboard navigation and pinch/scroll zoom; the zoom level carries
   over from photo to photo, including zooming out to smaller than the window.
 * A sound player with a waveform, plus optional auto-play and loop.
@@ -80,7 +88,11 @@ over its serial port and provides:
 * JPEGs with real **EXIF and XMP** metadata (date, GPS, caption, ★ rating, camera model,
   shutter, flash) that photo apps such as Apple Photos and Lightroom read.
 * Optional **2× or 3× upscaling** (Lanczos plus light sharpening).
+* **PNG or TIFF** instead, for lossless copies.
 * A matching `.wav` alongside every photo that has sound.
+* **Copy a photo** to the clipboard (⌘C in the viewer).
+* **Contact sheets** to print: pages of thumbnails with dates or captions, 3–6 per row, Letter
+  or A4.
 
 ## What you need
 
@@ -173,8 +185,10 @@ Already have a backup made with the Python tools? Use **Add backup folder…** i
 
 ⚠️ The camera obeys commands without asking for confirmation, and one of them, `02 10`, **formats
 the disc**. We found that out by erasing one (luckily it was restored from a backup made minutes
-earlier). The app and `md1tool` refuse to send it, and the app never writes to the disc. Before
-you try anything experimental yourself, make a full copy of the disc first. See
+earlier). The app and `md1tool` refuse to send it. The app writes to the disc only when you send
+pictures to the camera or rotate or protect photos there, and only after asking. Use the AC
+adapter for that if you can. Before you try anything experimental yourself, make a full copy of
+the disc first (**Back up the whole disc** on the camera screen). See
 [docs/protocol.md → Firmware hazards](docs/protocol.md#firmware-hazards-confirmed).
 
 ## Build from source

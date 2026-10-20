@@ -63,20 +63,24 @@ chosen photos, one library grouped by import day, matching of camera photos to t
 | Sony Album Utility | MD1 Studio |
 |---|---|
 | "Open Camera": camera image list with thumbnails; copy selected images to an album | Done (thumbnail browser, download chosen photos, "In library" marks) |
-| Export images as BMP / JPEG (quality 1–100) / TIFF | JPEG with EXIF/XMP, 1–3×; no TIFF/PNG yet |
-| Image info: **protect**, **caption** (14 chars) and edited date, **written back to the camera** (PIC_INF / PMP header rewrite) | Captions and dates stay in the library; no writing to the camera yet |
-| Rotate 90°/180° (stored in PIC_INF byte 5, so the camera shows it rotated) | Rotate in the library only |
-| **Copy To Camera**: send album images or any BMP/JPEG, fitted to 640 × 480, Fine or Snapshot quality | Not yet (hand-add proven in `md1tool/add_photo.py`) |
+| Export images as BMP / JPEG (quality 1–100) / TIFF | JPEG (with EXIF/XMP), PNG, TIFF; 1–3× |
+| Image info: **protect**, **caption** (14 chars) and edited date, written back to the camera | Protect: written to the camera (display to be confirmed). Captions and dates stay in the library: the MD1's headers carry tag 0x11, not ALBUM's 0x12 caption, and the camera has no way to show text |
+| Rotate 90°/180°, stored in PIC_INF byte 5 | Written to the camera (display and direction to be confirmed) |
+| **Copy To Camera**: any BMP/JPEG, fitted to 640 × 480, Fine or Snapshot | Done (`author.rs`): JPEG/PNG/TIFF/BMP/GIF/WebP or library photos with edits; fit or fill; standard or fine |
 | **Delete** pictures on the camera (`02 15`), skipping protected ones | Deliberately refused |
-| Albums in folders with titles; new / rename / delete; **set album cover** (`OV_IDX.PMX`) | One library grouped by import; no albums or covers yet |
-| Find images by recorded / edited date (on, before, after) | No search yet |
-| Print an image (fit / actual size) or a **contact sheet** (n per row) | Not yet |
-| Copy to clipboard (with a crop frame), paste from clipboard | Not yet |
-| Captions or dates under thumbnails | Badges only |
-| Slideshow (`SSHOW.EXE`) | Not yet (the camera's own slideshow plays sound; ours could too) |
+| Albums with titles; new / rename / delete; **set album cover** | Library albums with covers (rename, delete, add/remove). Camera-side albums (`PIC0000n` + OV_INF titles) not written |
+| Find images by recorded / edited date (on, before, after) | Search box over captions, places, taken and import dates |
+| Print an image or a **contact sheet** (n per row) | Contact sheets as 300 dpi JPEG pages (Letter/A4, 3–6 per row, date/caption/file labels) |
+| Copy to clipboard (with a crop frame), paste from clipboard | Copy (with edits) to the clipboard |
+| Captions or dates under thumbnails | Badges; captions/dates in the viewer and contact sheets |
+| Slideshow (`SSHOW.EXE`) | Slideshow with sound, crossfades, loop |
 | Monitor colour/gamma calibration | Not needed today |
 | TWAIN source for other apps | Not planned |
 | Thumbnail cache keyed on the status "change serial" (status bytes 18–21; MD1 returns FF) | Cache keyed on file size + directory-entry times |
+
+Camera clock: no command found (lab-notebook §16). Writes still to try: camera-side albums with
+titles, attaching sound to an uploaded photo (needs an ATRAC1 encoder), restoring a whole disc
+from the app.
 
 Hard safety rules (already enforced in `md1-core/src/camera.rs`): never send `02 10`, `02 15`;
 writes only inside explicit user actions; cap path payloads (firmware hangs on ~138-byte paths);

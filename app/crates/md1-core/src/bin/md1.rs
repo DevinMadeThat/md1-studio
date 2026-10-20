@@ -8,6 +8,9 @@
 //!                                               DISC_DIRs, which ones each library folder has)
 //!   md1 get     PORT DISC_DIR PSN_PATH...      (chosen photos + their sound + index files)
 //!   md1 scan    DISC_DIR            (JSON of albums and photos)
+//!   md1 add     PORT ALBUM IMAGE [fine] [fill]   (WRITES: add any picture to the album)
+//!   md1 mark    PORT ALBUM POSITION rotate N | protect on|off   (WRITES the album index)
+//!   md1 try     PORT HEX...         (03 01 / 03 03 with parameters; status before and after)
 //!   md1 wav     FILE.PMA OUT.wav
 //!   md1 export  DISC_DIR OUT_DIR [SCALE]
 //!   md1 auto    FILE.PMP            (auto-enhance levels as JSON)
@@ -15,7 +18,7 @@
 use std::path::Path;
 use std::process::ExitCode;
 
-use md1_core::{browse, camera, export, formats, import, library, transport, Error};
+use md1_core::{author, browse, camera, export, formats, import, library, transport, Error};
 
 fn trace() -> Option<Box<dyn std::io::Write + Send>> {
     let path = std::env::var("MD1_TRACE").ok()?;
@@ -84,6 +87,53 @@ fn run(args: &[String]) -> Result<(), Error> {
                 }
                 Ok(())
             })?;
+            let _ = cam.disconnect();
+        }
+        "add" | "mark" => {
+            let mut cam = connect(arg(2)?)?;
+            let mut album = author::Album::read(&mut cam, arg(3)?)?;
+            eprintln!("{}: {} photos", album.name, album.count());
+            let mut files = Vec::new();
+            if arg(1)? == "add" {
+                let img = image::open(arg(4)?).map_err(|e| Error::Protocol(e.to_string()))?.to_rgb8();
+                let flags = &args[5..];
+                let frame = author::to_camera_frame(&img, flags.iter().any(|f| f == "fill"));
+                let (name, pmp) = album.add_photo(&frame, flags.iter().any(|f| f == "fine"))?;
+                eprintln!("adding {name} ({} bytes)", pmp.len());
+                files.push((format!("/PIC_MD/{}/{name}", album.name), pmp));
+            } else {
+                let pos: usize = arg(4)?.parse::<usize>().map_err(|_| Error::Refused("bad position".into()))?.saturating_sub(1);
+                match (arg(5)?, arg(6)?) {
+                    ("rotate", n) => album.set_rotation(pos, n.parse().map_err(|_| Error::Refused("bad turns".into()))?)?,
+                    ("protect", on) => album.set_protected(pos, on == "on")?,
+                    _ => return Err(Error::Refused("rotate N | protect on|off".into())),
+                }
+                files.extend(album.index_files().into_iter().filter(|(p, _)| p.ends_with("PIC_INF.PMF")));
+            }
+            if arg(1)? == "add" {
+                files.extend(album.index_files());
+            }
+            author::write_files(&mut cam, &files, &mut |p, k, n| {
+                eprintln!("write {k}/{n} {p}");
+                Ok(())
+            })?;
+            eprintln!("Written and verified. Switch the camera off and on to see the change.");
+            let _ = cam.disconnect();
+        }
+        "try" => {
+            let mut cam = connect(arg(2)?)?;
+            let payload: Vec<u8> = args[3..]
+                .iter()
+                .map(|h| u8::from_str_radix(h, 16).map_err(|_| Error::Refused(format!("bad hex byte {h}"))))
+                .collect::<Result<_, _>>()?;
+            let before = cam.status()?;
+            println!("before: {}", md1_core::frame::hex(&before.raw));
+            let r = cam.transact_experimental(&payload)?;
+            println!("reply:  {}", md1_core::frame::hex(&r));
+            std::thread::sleep(std::time::Duration::from_millis(500));
+            let after = cam.status()?;
+            println!("after:  {}", md1_core::frame::hex(&after.raw));
+            println!("clock {} -> {}", before.clock, after.clock);
             let _ = cam.disconnect();
         }
         "scan" => {

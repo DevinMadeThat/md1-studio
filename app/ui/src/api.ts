@@ -100,6 +100,7 @@ export interface EditPatch {
 }
 
 export interface ExportOptions {
+  format: "jpeg" | "png" | "tiff";
   scale: number;
   sound: boolean;
   applyEdits: boolean;
@@ -179,6 +180,8 @@ export interface CameraPhoto {
   soundSize: number | null;
   soundSeconds: number | null;
   protected: boolean;
+  /** Quarter turns clockwise stored in the camera's album index. */
+  rotation: number;
   inIndex: boolean;
   quality: "FINE" | "STD";
   /** data: URL */
@@ -194,6 +197,24 @@ export interface CameraContents {
   photos: CameraPhoto[];
   inLibrary: (LibraryMatch | null)[];
   discPath: string | null;
+}
+
+/** A library album: an ordered set of item keys, like a Lightroom collection. */
+export interface LibAlbum {
+  id: string;
+  name: string;
+  cover: string | null;
+  items: string[];
+  created: string;
+}
+
+/** What to put on the camera: a library photo or an image file. */
+export type AddSource = { discPath: string; photoId: string } | { file: string };
+
+export interface WriteEvent {
+  label: string;
+  index: number;
+  count: number;
 }
 
 export type BrowseEvent =
@@ -236,8 +257,15 @@ export const api = {
   cameraStatus: () => invoke<CameraInfo | null>("camera_status"),
   browseCamera: (refresh: boolean) => invoke<CameraContents>("browse_camera", { refresh }),
   /** `paths`: camera paths of the photos to copy; null = the whole disc. */
-  downloadPhotos: (paths: string[] | null) => invoke<Disc>("download_photos", { paths }),
+  downloadPhotos: (paths: string[] | null) => invoke<Disc>("download_photos", { paths, today: localDate() }),
   cancelImport: () => invoke<void>("cancel_import"),
+  cameraAddPhotos: (sources: AddSource[], fine: boolean, fill: boolean) =>
+    invoke<CameraContents>("camera_add_photos", { sources, fine, fill }),
+  cameraMark: (ids: string[], change: { rotateBy?: number; protect?: boolean }) =>
+    invoke<CameraContents>("camera_mark", { ids, rotateBy: change.rotateBy ?? null, protect: change.protect ?? null }),
+  getAlbums: () => invoke<{ albums: LibAlbum[] }>("get_albums"),
+  saveAlbums: (albums: LibAlbum[]) => invoke<void>("save_albums", { data: { albums } }),
+  saveFile: (path: string, base64: string) => invoke<void>("save_file", { path, base64 }),
   exportPhotos: (items: { discPath: string; photoId: string }[], dest: string, options: ExportOptions) =>
     invoke<ExportSummary>("export_photos", { items, dest, options }),
   autoLevels: (discPath: string, photoId: string) => invoke<AutoLevels>("auto_levels", { discPath, photoId }),
@@ -252,6 +280,12 @@ export const api = {
 };
 
 export const fileUrl = (path: string) => convertFileSrc(path);
+
+/** Today, or the day of an ISO time, as "YYYY-MM-DD" in local time. */
+export function localDate(iso?: string) {
+  const t = iso ? new Date(iso) : new Date();
+  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
+}
 
 /** Binary command results arrive as an ArrayBuffer over Tauri's IPC protocol, but as a plain
  * number array if the app falls back to its message channel; accept both. */

@@ -251,6 +251,7 @@ export function openDateEditor(items: Item[], onSaved: (discs: Disc[]) => void) 
 // ------------------------------------------------------------------ export
 
 export interface ExportChoice {
+  format: "jpeg" | "png" | "tiff";
   scale: number;
   sound: boolean;
   applyEdits: boolean;
@@ -259,7 +260,8 @@ export interface ExportChoice {
 
 /** Ask how to export; resolves with the choice (remembered for next time) or null. */
 export function openExportSheet(photos: Photo[]): Promise<ExportChoice | null> {
-  const saved = prefs.get<ExportChoice>("export", { scale: 1, sound: true, applyEdits: true, metadata: true });
+  const saved = { format: "jpeg" as const, ...prefs.get<Partial<ExportChoice>>("export", {}) } as ExportChoice;
+  saved.scale ??= 1; saved.sound ??= true; saved.applyEdits ??= true; saved.metadata ??= true;
   const anySound = photos.some((p) => p.wavPath);
   const anyEdits = photos.some((p) => Object.keys(p.edits).length);
   return new Promise((resolve) => {
@@ -272,6 +274,11 @@ export function openExportSheet(photos: Photo[]): Promise<ExportChoice | null> {
            <label class="ex-size"><input type="radio" name="scale" value="${s}" ${saved.scale === s ? "checked" : ""}>
              <b>${s === 1 ? "Original" : `${s}× larger`}</b><span class="muted small">${640 * s} × ${480 * s}${s > 1 ? " · smooth upscale" : ""}</span></label>`).join("")}
        </div>
+       <div class="ed-group">File type</div>
+       <div class="seg ex-format">
+         ${(["jpeg", "png", "tiff"] as const).map((f) => `<label class="${saved.format === f ? "on" : ""}"><input type="radio" name="format" value="${f}" ${saved.format === f ? "checked" : ""}>${{ jpeg: "JPEG", png: "PNG", tiff: "TIFF" }[f]}</label>`).join("")}
+       </div>
+       <div class="muted small ex-format-note">JPEG keeps the details (date, place, caption) inside the file; PNG and TIFF are lossless but carry no details.</div>
        <div class="choice ex-opts">
          <label><input type="checkbox" id="ex-edits" ${saved.applyEdits ? "checked" : ""} ${anyEdits ? "" : "disabled"}> Apply my edits <span class="muted">(colour, crop, straighten, rotation)</span></label>
          <label><input type="checkbox" id="ex-meta" ${saved.metadata ? "checked" : ""}> Include details <span class="muted">(date, location, caption, favourite, camera settings)</span></label>
@@ -285,10 +292,14 @@ export function openExportSheet(photos: Photo[]): Promise<ExportChoice | null> {
        </div>`,
       { onClose: () => resolve(result) },
     );
+    m.el.querySelectorAll<HTMLInputElement>('input[name="format"]').forEach((r) =>
+      r.addEventListener("change", () => m.el.querySelectorAll(".ex-format label").forEach((l) => l.classList.toggle("on", l.contains(r) && r.checked))),
+    );
     m.el.querySelector("#ex-cancel")!.addEventListener("click", m.close);
     m.el.querySelector("#ex-go")!.addEventListener("click", () => {
       const q = <T extends HTMLElement>(s: string) => m.el.querySelector<T>(s)!;
       result = {
+        format: (m.el.querySelector<HTMLInputElement>('input[name="format"]:checked')?.value ?? "jpeg") as ExportChoice["format"],
         scale: +(m.el.querySelector<HTMLInputElement>('input[name="scale"]:checked')?.value ?? 1),
         sound: q<HTMLInputElement>("#ex-sound").checked,
         applyEdits: q<HTMLInputElement>("#ex-edits").checked,

@@ -174,3 +174,28 @@ Started **MD1 Studio** (`app/`, Tauri 2 + Rust); see `app/README.md`. Verified w
 `watch-test.log`, `watch-test2.log`. No backup existed. Their results are in this notebook and
 in protocol.md; partial reconstructions from the session transcript are in
 `md1tool/logs/recovered-from-transcript/`. The dated `md1.py` session logs are intact.
+
+## 16. Real camera with the app's Rust code (2026-10-19, ≈17:00–17:40)
+
+Disc 2 (restored + `PSN00019`, 20 photos) in the camera, on battery (power 4). Traces:
+`md1tool/logs/*-rust-*.log`.
+
+* **App's first real session (owner):** connect, thumbnail browse, download of `PSN00019`
+  only. Worked.
+* **Clock: no luck.** `03 03` and `03 01` with a BCD date/time in five layouts (`YY MM DD hh mm
+  ss`, 4-digit year `20 YY …`, and a leading `01` selector) all return status `00` and change
+  nothing: the status clock stays `50-01-01`. No Sony program sets the clock either
+  (reverse-engineering-notes §5). Setting it would need the untested command space; not swept.
+* **Added a photo the camera didn't take** (`md1 add`, md1-core `author.rs`): a Wikimedia JPEG
+  fitted to 640 × 480, encoded baseline 4:2:0 and rewritten into the camera's JPEG layout (no
+  APPn, DQT/DHT before SOF0, component ids 0/1/2), with a synthesized 256-byte PMP header
+  (template from a camera STD photo, quality byte 0x17, exposure fields 0x8000 = unknown,
+  flash 0). Wrote `PSN00020.PMP` (37 876 bytes), `PIDX000.PMX` (+1 block), `PIC_INF.PMF`
+  (+1 record, counts 21), `OV_INF.PMF`; every file read back identical. Rust `write_file`
+  (delete, create, 2 KB writes, close) worked first time on the hardware.
+* **Album-index edits:** photo 1 record byte 5 |= 0x04 (rotation, one quarter turn per Sony's
+  code), photo 2 record byte 14 bit 0 (protect). Read back identical.
+* Correction: `OV_INF.PMF` holds the album number at **0x120** (0001 on disc 2, 0000 on the
+  camera-formatted disc), not 0x122.
+* **To check on the camera after a power cycle** (owner): does photo 21 appear and display?
+  Is photo 1 shown rotated, and which way? Does photo 2 show a protect mark?

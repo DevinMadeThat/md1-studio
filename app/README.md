@@ -58,9 +58,26 @@ mirrors `md1tool/md1.py`, which was proven on a real camera.
 * **Open old backups**: "Add backup folder…" accepts any `downloads/discN` folder made by
   `md1tool` (full mirrors and the older photo-only `raw/` layout).
 
-Not in the app yet (the code paths exist in `md1-core` and `md1tool`): restoring a disc from a
-backup and adding photos to the camera. They write to the disc, so they'll come with explicit
-confirmation screens.
+* **Imports and albums**: the sidebar lists each import (by date and time, like Apple Photos'
+  Imports) and the user's albums (`<library>/albums.json`: ordered item keys and a cover). The
+  per-disc folders sit in a collapsed "MiniDiscs" list; new ones are named after the day they
+  were first imported (`MiniDisc 2026-10-19`).
+* **Search**, **slideshow with sound** (`ui/src/slideshow.ts`), **copy to clipboard**, **contact
+  sheets** (`ui/src/contactSheet.ts`, 300 dpi JPEG pages), export as **JPEG, PNG or TIFF**.
+* **Write to the camera** (`crates/md1-core/src/author.rs`), always after a confirmation sheet
+  that warns when the camera is on battery:
+  * *Add pictures*: any image or library photo → 640 × 480 (fit or fill) → baseline 4:2:0 JPEG
+    in the camera's own layout (no APPn, tables before the frame header, component ids 0/1/2)
+    with a synthesized PMP header, an 80 × 64 thumbnail block, and the album index and album
+    list updated. Proven on the hardware 2026-10-19 (docs/lab-notebook.md §16).
+  * *Rotate / protect*: PIC_INF record byte 5 bits 2–3 and byte 14 bit 0, where Sony's software
+    keeps them.
+  * The album is edited only if it matches the layout we've proven (counts agree, one thumbnail
+    block per photo, a single album on the disc); every file is read back and compared; the
+    files the app writes are the photo first, then the indexes.
+
+Not in the app yet: restoring a whole disc from a backup (`md1tool/restore.py`), camera-side
+albums, and sound for uploaded photos.
 
 ## Safety
 
@@ -68,7 +85,8 @@ confirmation screens.
 
 * read commands are always allowed;
 * write commands (mkdir, create, write, delete, rmdir) only after `set_writes_enabled(true)`,
-  which the app never calls in v0.1;
+  which `author::write_files` turns on for the duration of a write the user confirmed;
+* `03 01` / `03 03` with parameters only through `transact_experimental` (used by `md1 try`);
 * `02 10` (format — it erased a disc once), `02 15` (delete picture), `02 14`, `02 09`, `02 02`
   are refused unconditionally; so is any command not on the list, and any path payload over
   96 bytes (firmware 1.14 hangs on ~138-byte paths).

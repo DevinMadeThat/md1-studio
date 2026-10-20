@@ -148,6 +148,9 @@ parameters) except the denylisted destructive ones. Status `03` = unsupported.
 | `03 00`, `03 04`–`03 3F` | `03` | Unsupported |
 | **`03 01`** | `00`, no data | **Supported, purpose unknown.** Re-tested with the owner watching: no screen change, no beep, no drive activity. Not used by any Sony software. |
 | **`03 03`** | `00`, no data | **Supported, purpose unknown.** Same: no visible or audible effect. |
+
+2026-10-19: `03 01` and `03 03` also accept parameters (a BCD date/time in several layouts) and
+reply `00`, but neither sets the clock (lab-notebook §16). No clock-set command is known.
 | `02 05`, `02 06`, `02 0B`, `02 0C`, `02 0E`, `02 0F` | `FF` | Supported; fail for lack of parameters |
 | **`02 07`** | `FE` | **Supported, not used by Sony's software**; FE like find-next end — maybe "close find". No visible effect. |
 | `02 0A` (no path) | `00`, handle `00 00` | An empty path opens *something* (the volume?) |

@@ -22,6 +22,11 @@ pub const MAX_PATH_PAYLOAD: usize = 96;
 /// `02 09` renames; `02 02` changes directory (unused, and changes path resolution).
 pub const FORBIDDEN: &[(u8, u8)] = &[(0x02, 0x10), (0x02, 0x15), (0x02, 0x14), (0x02, 0x09), (0x02, 0x02)];
 
+/// Commands the camera accepts but no Sony software sends (`03 01`, `03 03`: bare, they reply
+/// OK and change nothing visible). Sent only through [`Camera::transact_experimental`], to work
+/// out what they do with parameters (docs/next-steps.md).
+pub const EXPERIMENTAL: &[(u8, u8)] = &[(0x03, 0x01), (0x03, 0x03)];
+
 pub const SPEED_CODES: [(u8, u32); 5] = [(0, 9600), (1, 19200), (2, 38400), (3, 57600), (4, 115200)];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -137,6 +142,7 @@ pub struct Camera {
     idx: usize,
     trace: Option<Box<dyn Write + Send>>,
     writes_enabled: bool,
+    experimental: bool,
     pub timeout: Duration,
     pub camera_id: String,
 }
@@ -149,6 +155,7 @@ impl Camera {
             idx: 0,
             trace,
             writes_enabled: false,
+            experimental: false,
             timeout: Duration::from_secs(6),
             camera_id: String::new(),
         }
@@ -180,6 +187,9 @@ impl Camera {
         let refuse = |why: &str| Err(Error::Refused(format!("{} {why}", hex(&p[..2]))));
         if FORBIDDEN.contains(&cmd) {
             return refuse("is forbidden (format / delete-picture / rename / chdir)");
+        }
+        if self.experimental && EXPERIMENTAL.contains(&cmd) && p.len() <= MAX_PATH_PAYLOAD {
+            return Ok(());
         }
         let read = matches!(
             cmd,
@@ -253,6 +263,17 @@ impl Camera {
 
     pub fn transact(&mut self, payload: &[u8]) -> Result<Vec<u8>, Error> {
         self.transact_timeout(payload, self.timeout)
+    }
+
+    /// Send one of the [`EXPERIMENTAL`] commands with parameters. Anything else is refused.
+    pub fn transact_experimental(&mut self, payload: &[u8]) -> Result<Vec<u8>, Error> {
+        if payload.len() < 2 || !EXPERIMENTAL.contains(&(payload[0], payload[1])) {
+            return Err(Error::Refused(format!("{} is not an experimental command", hex(payload))));
+        }
+        self.experimental = true;
+        let r = self.transact(payload);
+        self.experimental = false;
+        r
     }
 
     fn ok(&mut self, payload: &[u8], what: &str) -> Result<Vec<u8>, Error> {
@@ -607,6 +628,16 @@ mod tests {
         for cmd in [[0x03, 0x01], [0x03, 0x03], [0x02, 0x07], [0x02, 0x11], [0x04, 0x00]] {
             assert!(cam.check_permitted(&cmd).is_err());
         }
+    }
+
+    #[test]
+    fn experimental_path_only_allows_03_01_and_03_03() {
+        let mut cam = Camera::new(Box::new(NullPort), None);
+        for cmd in [&[0x02, 0x10][..], &[0x02, 0x15, 0, 1], &[0x02, 0x03, b'/', 0], &[0x03, 0x02], &[0x04, 0x00]] {
+            assert!(matches!(cam.transact_experimental(cmd), Err(Error::Refused(_))), "{cmd:02x?}");
+        }
+        // Outside transact_experimental, even 03 03 stays refused.
+        assert!(cam.check_permitted(&[0x03, 0x03, 0x26]).is_err());
     }
 
     #[test]

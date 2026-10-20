@@ -260,8 +260,20 @@ pub struct ExportResult {
     pub already_there: usize,
 }
 
+/// File type for exported photos. PNG and TIFF are lossless copies of the rendered picture
+/// (no EXIF; the metadata options apply to JPEG only).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, serde::Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum Format {
+    #[default]
+    Jpeg,
+    Png,
+    Tiff,
+}
+
 #[derive(Debug, Clone, Copy)]
 pub struct ExportOptions {
+    pub format: Format,
     /// 1, 2 or 3: upscale the exported JPEG (Lanczos + light sharpening).
     pub scale: f64,
     /// Write the photo's sound next to it as a WAV.
@@ -274,7 +286,7 @@ pub struct ExportOptions {
 
 impl Default for ExportOptions {
     fn default() -> Self {
-        Self { scale: 1.0, sound: true, apply_edits: true, metadata: true }
+        Self { format: Format::Jpeg, scale: 1.0, sound: true, apply_edits: true, metadata: true }
     }
 }
 
@@ -303,12 +315,28 @@ pub fn export_jpeg(p: &Photo, opts: &ExportOptions) -> Result<Vec<u8>, Error> {
     Ok(if opts.metadata { jpeg_with_exif(&body, &p.info, date.as_deref(), &edits, size, orient) } else { body })
 }
 
+/// The photo rendered (edits, upscale) and saved as PNG or TIFF.
+fn export_lossless(p: &Photo, opts: &ExportOptions, format: image::ImageFormat) -> Result<Vec<u8>, Error> {
+    let pmp = fs::read(&p.pmp_path)?;
+    let jpeg = crate::formats::extract_jpeg(&pmp).ok_or_else(|| Error::Protocol(format!("{}: no JPEG inside", p.stem)))?;
+    let img = crate::adjust::decode_jpeg(jpeg).ok_or_else(|| Error::Protocol(format!("{}: unreadable JPEG", p.stem)))?;
+    let look = if opts.apply_edits { p.edits.clone() } else { PhotoEdits::default() };
+    let out = crate::adjust::render(&img, &look, opts.scale);
+    let mut buf = std::io::Cursor::new(Vec::new());
+    out.write_to(&mut buf, format).map_err(|e| Error::Protocol(e.to_string()))?;
+    Ok(buf.into_inner())
+}
+
 pub fn export_photos(photos: &[(&str, &Photo)], dest: &Path, opts: &ExportOptions) -> Result<ExportResult, Error> {
     fs::create_dir_all(dest)?;
     let mut res = ExportResult { written: Vec::new(), already_there: 0 };
     for (disc_name, p) in photos {
         let stem = sanitize(&format!("{disc_name} {} {}", p.album, p.stem));
-        let mut files = vec![("jpg", export_jpeg(p, opts)?)];
+        let mut files = vec![match opts.format {
+            Format::Jpeg => ("jpg", export_jpeg(p, opts)?),
+            Format::Png => ("png", export_lossless(p, opts, image::ImageFormat::Png)?),
+            Format::Tiff => ("tif", export_lossless(p, opts, image::ImageFormat::Tiff)?),
+        }];
         if opts.sound {
             if let Some(w) = &p.wav_path {
                 files.push(("wav", fs::read(w)?));

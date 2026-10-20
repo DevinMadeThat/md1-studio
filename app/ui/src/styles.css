@@ -520,3 +520,61 @@ textarea.caption:focus { border-color: var(--accent); background: rgba(255, 255,
 .ab-links { display: flex; gap: 14px; margin-top: 3px; }
 .ab-progress { flex: 1; min-width: 0; }
 .ab-progress .progress-meta { margin-top: 6px; }
+
+/* ------------------------------------------------ sidebar: imports, albums, MiniDiscs */
+.nav-thumb { width: 20px; height: 15px; object-fit: cover; border-radius: 3px; display: block; }
+.nav-star { color: #e7a614; font-size: 15px; line-height: 1; }
+.nav-section { display: flex; align-items: center; }
+.nav-section-btn { margin-left: auto; border: 0; background: none; color: var(--muted); padding: 2px 4px; border-radius: 4px; display: grid; place-items: center; }
+.nav-section-btn:hover { background: var(--hover); color: var(--text); }
+.nav-toggle { border: 0; background: none; width: 100%; text-align: left; cursor: pointer; gap: 4px; margin-top: 14px; }
+.nav-toggle .muted { font-weight: 400; margin-left: 4px; }
+
+/* ------------------------------------------------ toolbar search */
+.search { position: relative; display: flex; align-items: center; color: var(--muted); }
+.search svg { position: absolute; left: 8px; pointer-events: none; }
+.search .field { width: 150px; height: 28px; padding: 0 8px 0 26px; font-size: 12px; }
+.search .field:focus { width: 200px; }
+
+/* ------------------------------------------------ camera writes */
+.ab-cam { display: flex; align-items: center; gap: 6px; padding-left: 14px; border-left: 1px solid var(--line); }
+
+/* ------------------------------------------------ export sheet, contact sheet */
+.ex-format { margin: 2px 0 6px; }
+.ex-format label { padding: 3px 12px; border-radius: 5px; font-size: 12px; color: var(--muted); cursor: pointer; }
+.ex-format label.on { background: var(--panel); color: var(--text); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12); }
+.ex-format input { display: none; }
+.ex-format-note { margin-bottom: 10px; }
+.cs-row { display: flex; gap: 14px; margin: 12px 0; flex-wrap: wrap; }
+.cs-row label { display: grid; gap: 4px; font-size: 12px; color: var(--muted); }
+.modal .cs-row .field { width: auto; }
+
+/* ------------------------------------------------ slideshow */
+.slideshow { position: fixed; inset: 0; z-index: 30; background: #000; color: #eee; cursor: none; }
+.slideshow.show-controls { cursor: default; }
+.ss-stage { position: absolute; inset: 0; }
+.ss-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; opacity: 0; transition: opacity 0.9s ease; }
+.ss-img.on { opacity: 1; }
+.ss-img.rot90 { transform: rotate(90deg); }
+.ss-img.rot180 { transform: rotate(180deg); }
+.ss-img.rot270 { transform: rotate(270deg); }
+.ss-caption {
+  position: absolute; left: 0; right: 0; bottom: 70px; text-align: center; display: flex; flex-direction: column; gap: 4px;
+  font-size: 18px; text-shadow: 0 1px 6px rgba(0, 0, 0, 0.9);
+}
+.ss-caption .muted { color: #bbb; font-size: 14px; }
+.ss-controls {
+  position: absolute; left: 50%; bottom: 18px; transform: translateX(-50%);
+  display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 12px;
+  background: rgba(30, 30, 34, 0.8); backdrop-filter: blur(10px); opacity: 0; transition: opacity 0.3s;
+}
+.slideshow.show-controls .ss-controls { opacity: 1; }
+.ss-controls button { border: 0; background: none; color: #ddd; width: 34px; height: 34px; border-radius: 8px; display: grid; place-items: center; }
+.ss-controls button:hover { background: rgba(255, 255, 255, 0.12); }
+.ss-controls button.off { opacity: 0.35; }
+.ss-controls label { display: flex; align-items: center; gap: 4px; color: #bbb; font-size: 12px; }
+.ss-controls select { background: transparent; color: #ddd; border: 1px solid rgba(255, 255, 255, 0.2); border-radius: 6px; font-size: 12px; }
+.ss-sep { width: 1px; height: 20px; background: rgba(255, 255, 255, 0.15); margin: 0 4px; }
+.ss-count { color: #999; font-size: 12px; min-width: 52px; text-align: center; font-variant-numeric: tabular-nums; }
+.selbar { flex-wrap: wrap; row-gap: 6px; }
+.selbar .selcount, .selbar .linkish, .selbar .btn { white-space: nowrap; }

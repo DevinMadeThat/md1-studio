@@ -37,6 +37,8 @@ pub struct CameraPhoto {
     pub sound_size: Option<u32>,
     pub sound_seconds: Option<f64>,
     pub protected: bool,
+    /// Quarter turns clockwise stored in the album index (record byte 5 bits 2–3).
+    pub rotation: u8,
     /// Listed in the album index (the camera shows only indexed photos).
     pub in_index: bool,
     /// "FINE" / "STD", guessed from the file size (the camera budgets 64 KB / 128 KB).
@@ -117,6 +119,29 @@ pub fn base64(data: &[u8]) -> String {
     out
 }
 
+/// Inverse of [`base64`]; ignores anything outside the alphabet (e.g. a `data:` URL prefix must
+/// be stripped first).
+pub fn base64_decode(s: &str) -> Vec<u8> {
+    let val = |c: u8| match c {
+        b'A'..=b'Z' => Some(c - b'A'),
+        b'a'..=b'z' => Some(c - b'a' + 26),
+        b'0'..=b'9' => Some(c - b'0' + 52),
+        b'+' => Some(62),
+        b'/' => Some(63),
+        _ => None,
+    };
+    let (mut out, mut acc, mut bits) = (Vec::with_capacity(s.len() * 3 / 4), 0u32, 0);
+    for v in s.bytes().filter_map(val) {
+        acc = acc << 6 | v as u32;
+        bits += 6;
+        if bits >= 8 {
+            bits -= 8;
+            out.push((acc >> bits) as u8);
+        }
+    }
+    out
+}
+
 /// Read the listing, album indexes and thumbnails. `cache_dir` (per disc) avoids re-reading
 /// unchanged files.
 pub fn browse(
@@ -180,19 +205,19 @@ pub fn photos_from(tree: &[(String, DirEntry)], files: &HashMap<String, Vec<u8>>
         pidx.sort();
         let thumbs: Vec<Option<&[u8]>> = pidx.iter().flat_map(|p| formats::pmx_thumbnails(&files[*p])).collect();
 
-        let mut numbers: Vec<(u16, bool, bool)> = Vec::new(); // number, indexed, protected
+        let mut numbers: Vec<(u16, bool, bool, u8)> = Vec::new(); // number, indexed, protected, rotation
         if let Some(ix) = &index {
-            numbers.extend(ix.records.iter().map(|r| (r.number, true, r.protected)));
+            numbers.extend(ix.records.iter().map(|r| (r.number, true, r.protected, (r.flags[0] >> 2) & 3)));
         }
         let mut extra: Vec<u16> = tree
             .iter()
             .filter_map(|(p, _)| p.strip_prefix(&dir)?.strip_prefix("PSN")?.strip_suffix(".PMP")?.parse().ok())
-            .filter(|n| !numbers.iter().any(|(m, _, _)| m == n))
+            .filter(|n| !numbers.iter().any(|(m, ..)| m == n))
             .collect();
         extra.sort();
-        numbers.extend(extra.into_iter().map(|n| (n, false, false)));
+        numbers.extend(extra.into_iter().map(|n| (n, false, false, 0)));
 
-        for (position, (n, indexed, protected)) in numbers.into_iter().enumerate() {
+        for (position, (n, indexed, protected, rotation)) in numbers.into_iter().enumerate() {
             let stem = format!("PSN{n:05}");
             let path = format!("{dir}{stem}.PMP");
             let Some(e) = entry(&path) else { continue };
@@ -214,6 +239,7 @@ pub fn photos_from(tree: &[(String, DirEntry)], files: &HashMap<String, Vec<u8>>
                 sound_size: sound.map(|s| s.size),
                 sound_seconds: sound.map(|s| formats::pma_seconds(s.size as u64)),
                 protected,
+                rotation,
                 in_index: indexed,
                 quality: if e.size > 66_000 { "FINE" } else { "STD" },
                 thumb: thumb.map(|j| format!("data:image/jpeg;base64,{}", base64(j))),
@@ -235,6 +261,9 @@ mod tests {
         assert_eq!(base64(b"fo"), "Zm8=");
         assert_eq!(base64(b"foo"), "Zm9v");
         assert_eq!(base64(b"foobar"), "Zm9vYmFy");
+        for t in [&b""[..], b"f", b"fo", b"foo", b"\x00\xff\x10hello"] {
+            assert_eq!(base64_decode(&base64(t)), t);
+        }
     }
 
     #[test]

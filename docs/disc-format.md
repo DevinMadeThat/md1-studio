@@ -148,7 +148,7 @@ File sizes: Standard ≈ 60–64 KB, Fine ≈ 106–128 KB (the camera budgets 6
 | `PIC_INF.PMF` | 0x0C–0x0F | body length = file length − 0x100 |
 | `PIC_INF.PMF` | 0x104, 0x106, 0x10E (BE16 each) | picture count (three copies) |
 | `PIC_INF.PMF` | 0x50C + 16·i | picture record i (see above) |
-| `OV_INF.PMF` | 0x100 and 0x124 (BE16 each) | picture count of the album (two copies); album number at 0x122 |
+| `OV_INF.PMF` | 0x100 and 0x124 (BE16 each) | picture count of the album (two copies); album number at 0x120 (0001 for PIC00001, 0000 for PIC00000) |
 
 ## Adding a photo by hand (confirmed working)
 

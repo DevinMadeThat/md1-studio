@@ -112,7 +112,16 @@ pub fn scan_disc(disc_dir: &Path) -> Option<Disc> {
     let meta = DiscMeta::load(disc_dir).unwrap_or_default();
     let times = listing_times(disc_dir);
     let user_edits = edits::load(disc_dir);
-    let first_import = meta.imports.first().cloned();
+    // Folders from before per-photo import times: one import time for the whole folder (its
+    // first recorded import, else its oldest photo file), so it shows as one import.
+    let first_import = meta.imports.first().cloned().or_else(|| {
+        import::files_under(&root)
+            .iter()
+            .filter(|f| f.extension().is_some_and(|e| e == "PMP"))
+            .filter_map(|f| fs::metadata(f).and_then(|m| m.modified()).ok())
+            .min()
+            .map(iso_utc)
+    });
     // Make sure JPEG/WAV copies exist (older backups may predate sound decoding).
     let _ = import::convert_disc(disc_dir);
 
@@ -161,9 +170,7 @@ pub fn scan_disc(disc_dir: &Path) -> Option<Disc> {
             let created = times.get(&cam_path).map(|&t| DosTime::from_u32(t));
             let record = index.as_ref().and_then(|ix| ix.records.iter().find(|r| r.number == n));
             let id = format!("{album}/{stem}");
-            let imported_at = meta.photo_imports.get(&id).cloned().or_else(|| first_import.clone()).or_else(|| {
-                fs::metadata(&pmp).and_then(|m| m.modified()).ok().map(iso_utc)
-            });
+            let imported_at = meta.photo_imports.get(&id).cloned().or_else(|| first_import.clone());
             let thumb = (pos < indexed).then(|| thumbs.get(pos)).flatten();
             photos.push(Photo {
                 edits: user_edits.get(&id).cloned().unwrap_or_default(),
@@ -294,6 +301,7 @@ mod tests {
             sound_size: None,
             sound_seconds: None,
             protected: false,
+            rotation: 0,
             in_index: true,
             quality: "STD",
             thumb: None,

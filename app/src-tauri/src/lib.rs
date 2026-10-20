@@ -332,18 +332,16 @@ async fn browse_camera(app: AppHandle, refresh: bool) -> CmdResult<CameraContent
     .map_err(err)?
 }
 
-/// A new folder in the library for a disc seen for the first time: "Disc 1", "Disc 2", …
-fn new_disc_dir(app: &AppHandle) -> (PathBuf, String) {
+/// A new folder in the library for a disc seen for the first time, named after the day it was
+/// first imported (like Lightroom's date folders): "MiniDisc 2026-10-19", "MiniDisc 2026-10-19 (2)".
+/// `day` is the user's local date, "YYYY-MM-DD" (from the web view, which knows the time zone).
+fn new_disc_dir(app: &AppHandle, day: &str) -> (PathBuf, String) {
     let lib = library_dir(app, &app.state::<AppState>().settings.lock().unwrap());
-    let names: Vec<String> = disc_paths(app)
-        .iter()
-        .filter_map(|p| library::scan_disc(p).map(|d| d.name))
-        .collect();
-    let mut k = names.len() + 1;
+    let mut k = 1;
     loop {
-        let name = format!("Disc {k}");
+        let name = if k == 1 { format!("MiniDisc {day}") } else { format!("MiniDisc {day} ({k})") };
         let dir = lib.join(sanitize(&name));
-        if !dir.exists() && !names.contains(&name) {
+        if !dir.exists() {
             return (dir, name);
         }
         k += 1;
@@ -354,7 +352,7 @@ fn new_disc_dir(app: &AppHandle) -> (PathBuf, String) {
 /// sound) or, when `None`, the whole disc as a full backup. Photos from the same disc always go
 /// into that disc's folder (recognized by its label and format time).
 #[tauri::command]
-async fn download_photos(app: AppHandle, paths: Option<Vec<String>>) -> CmdResult<Disc> {
+async fn download_photos(app: AppHandle, paths: Option<Vec<String>>, today: String) -> CmdResult<Disc> {
     tauri::async_runtime::spawn_blocking(move || {
         let state = app.state::<AppState>();
         state.cancel.store(false, Ordering::SeqCst);
@@ -363,7 +361,7 @@ async fn download_photos(app: AppHandle, paths: Option<Vec<String>>) -> CmdResul
 
         let (dest, name) = match matching_disc(&app, &session.volume) {
             Some(p) => (PathBuf::from(p), String::new()),
-            None => new_disc_dir(&app),
+            None => new_disc_dir(&app, &today),
         };
         fs::create_dir_all(&dest).map_err(err)?;
         allow_assets(&app, &dest);
@@ -391,6 +389,152 @@ async fn download_photos(app: AppHandle, paths: Option<Vec<String>>) -> CmdResul
     .map_err(err)?
 }
 
+// ---------- writing to the camera ----------
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AddSource {
+    /// A library photo (sent with its edits applied)…
+    disc_path: Option<String>,
+    photo_id: Option<String>,
+    /// …or any image file.
+    file: Option<String>,
+}
+
+fn source_image(s: &AddSource) -> Result<image::RgbImage, String> {
+    if let Some(f) = &s.file {
+        return image::open(f).map(|i| i.to_rgb8()).map_err(|e| format!("{f}: {e}"));
+    }
+    let (Some(d), Some(id)) = (&s.disc_path, &s.photo_id) else { return Err("nothing to send".into()) };
+    let disc = library::scan_disc(Path::new(d)).ok_or("disc folder not found")?;
+    let photo = find_photo(&disc, id).ok_or("photo not found")?;
+    Ok(md1_core::adjust::render(&photo_pixels(&photo)?, &photo.edits, 1.0))
+}
+
+#[derive(Serialize, Clone)]
+#[serde(rename_all = "camelCase")]
+struct WriteEvent {
+    label: String,
+    index: usize,
+    count: usize,
+}
+
+/// Files to write to the camera: (camera path, contents), in write order.
+type CameraFiles = Vec<(String, Vec<u8>)>;
+/// Edits an album in memory and says which files to write.
+type AlbumWork<'a> = dyn FnMut(&mut md1_core::author::Album, &[CameraPhoto]) -> Result<CameraFiles, String> + 'a;
+
+/// Run `work` on the connected camera's only album, write what it returns, and browse again.
+fn write_album(
+    app: &AppHandle,
+    work: &mut AlbumWork,
+) -> CmdResult<CameraContents> {
+    let state = app.state::<AppState>();
+    let mut slot = state.session.lock().unwrap();
+    let session = slot.as_mut().ok_or("The camera is not connected.")?;
+    if session.browsed.is_none() {
+        session.browsed = Some(browse::browse(&mut session.cam, None, &mut |_| Ok(())).map_err(err)?);
+    }
+    let b = session.browsed.as_ref().unwrap();
+    let mut albums: Vec<&str> = b.photos.iter().map(|p| p.album.as_str()).collect();
+    albums.dedup();
+    let name = match albums.as_slice() {
+        [one] => one.to_string(),
+        [] => b.tree.iter().filter(|(p, e)| e.is_dir && p.starts_with("/PIC_MD/PIC")).map(|(p, _)| p[8..].to_string()).next()
+            .ok_or("This disc has no album folder yet. Take one photo with the camera first.")?,
+        _ => return Err("This disc has more than one album; writing to it isn't supported yet.".into()),
+    };
+    let mut album = md1_core::author::Album::from_browsed(b, &name).map_err(err)?;
+    let photos = b.photos.clone();
+    let files = work(&mut album, &photos)?;
+    let emit_app = app.clone();
+    let result = md1_core::author::write_files(&mut session.cam, &files, &mut |path, index, count| {
+        let name = path.rsplit('/').next().unwrap_or(path);
+        let label = if name.starts_with("PSN") { format!("Writing photo {name}") } else { format!("Updating {name}") };
+        let _ = emit_app.emit("write-event", WriteEvent { label, index, count });
+        Ok(())
+    });
+    // Browse again either way, so the view matches what is really on the disc now.
+    let cache = session.volume.as_ref().and_then(|v| {
+        let key: String = v.fingerprint().chars().map(|c| if c.is_ascii_alphanumeric() { c } else { '_' }).collect();
+        Some(app.path().app_cache_dir().ok()?.join("camera").join(key))
+    });
+    let fresh = browse::browse(&mut session.cam, cache.as_deref(), &mut |_| Ok(()));
+    result.map_err(err)?;
+    session.browsed = Some(fresh.map_err(err)?);
+    Ok(contents(app, session.browsed.as_ref().unwrap()))
+}
+
+/// Add pictures to the end of the camera's album (fitted to 640 × 480; `fill` crops instead
+/// of letterboxing). The camera shows them after it is switched off and on.
+#[tauri::command]
+async fn camera_add_photos(app: AppHandle, sources: Vec<AddSource>, fine: bool, fill: bool) -> CmdResult<CameraContents> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let frames: Vec<image::RgbImage> = sources
+            .iter()
+            .map(|s| source_image(s).map(|img| md1_core::author::to_camera_frame(&img, fill)))
+            .collect::<Result<_, _>>()?;
+        write_album(&app, &mut |album, _| {
+            let mut photos = Vec::new();
+            for f in &frames {
+                let (name, pmp) = album.add_photo(f, fine).map_err(err)?;
+                photos.push((format!("/PIC_MD/{}/{name}", album.name), pmp));
+            }
+            photos.extend(album.index_files());
+            Ok(photos)
+        })
+    })
+    .await
+    .map_err(err)?
+}
+
+/// Change photos in the camera's album index: rotate by quarter turns and/or protect.
+#[tauri::command]
+async fn camera_mark(app: AppHandle, ids: Vec<String>, rotate_by: Option<i8>, protect: Option<bool>) -> CmdResult<CameraContents> {
+    tauri::async_runtime::spawn_blocking(move || {
+        write_album(&app, &mut |album, photos| {
+            for id in &ids {
+                let p = photos.iter().find(|p| &p.id == id).ok_or("photo not on the camera")?;
+                if !p.in_index {
+                    return Err(format!("{} isn't in the album index", p.stem));
+                }
+                if let Some(by) = rotate_by {
+                    album.set_rotation(p.position, ((p.rotation as i8 + by).rem_euclid(4)) as u8).map_err(err)?;
+                }
+                if let Some(on) = protect {
+                    album.set_protected(p.position, on).map_err(err)?;
+                }
+            }
+            Ok(album.index_files().into_iter().filter(|(p, _)| p.ends_with("PIC_INF.PMF")).collect())
+        })
+    })
+    .await
+    .map_err(err)?
+}
+
+// ---------- albums (collections of library photos) ----------
+
+fn albums_path(app: &AppHandle) -> PathBuf {
+    library_dir(app, &app.state::<AppState>().settings.lock().unwrap()).join("albums.json")
+}
+
+/// The user's albums, as the frontend stored them (`{ albums: [...] }`).
+#[tauri::command]
+fn get_albums(app: AppHandle) -> serde_json::Value {
+    fs::read(albums_path(&app)).ok().and_then(|b| serde_json::from_slice(&b).ok()).unwrap_or(serde_json::json!({ "albums": [] }))
+}
+
+#[tauri::command]
+fn save_albums(app: AppHandle, data: serde_json::Value) -> CmdResult<()> {
+    import::save_atomic(&albums_path(&app), &serde_json::to_vec_pretty(&data).map_err(err)?).map_err(err)
+}
+
+/// Write bytes the frontend made (a contact sheet) to a path the user chose in a save dialog.
+#[tauri::command]
+fn save_file(path: String, base64: String) -> CmdResult<()> {
+    fs::write(path, browse::base64_decode(&base64)).map_err(err)
+}
+
 // ---------- export ----------
 
 #[derive(Deserialize)]
@@ -411,6 +555,8 @@ struct ExportSummary {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ExportOpts {
+    #[serde(default)]
+    format: export::Format,
     scale: f64,
     sound: bool,
     apply_edits: bool,
@@ -436,6 +582,7 @@ async fn export_photos(items: Vec<ExportItem>, dest: String, options: ExportOpts
         }
         let refs: Vec<(&str, &Photo)> = chosen.iter().map(|(k, p)| (discs[*k].name.as_str(), p)).collect();
         let opts = export::ExportOptions {
+            format: options.format,
             scale: options.scale.clamp(1.0, 4.0),
             sound: options.sound,
             apply_edits: options.apply_edits,
@@ -719,6 +866,11 @@ pub fn run() {
             cancel_import,
             browse_camera,
             download_photos,
+            camera_add_photos,
+            camera_mark,
+            get_albums,
+            save_albums,
+            save_file,
             export_photos,
             edit_photos,
             auto_levels,
