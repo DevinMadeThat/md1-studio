@@ -204,3 +204,9 @@ Disc 2 (restored + `PSN00019`, 20 photos) in the camera, on battery (power 4). T
   in red, while an unprotected photo offers two options. So byte 14 bit 0 is the protect flag.
 * Library imports now start a photo turned the way the camera shows it (unless it was already
   edited in the library).
+* **Deleted photo 21** (the test upload) with `md1 del`: record and thumbnail block removed from
+  `PIC_INF.PMF`/`PIDX000.PMX`, counts updated in both index files, then `PSN00020.PMP` deleted
+  (`NRA00020.PMA` didn't exist and was skipped). Browse afterwards: 20 photos, 20 thumbnails.
+  Rehearsed first on the fake camera, including a photo with sound.
+* **Format from the app**: rehearsed on the fake camera only (`md1 format` with the confirmation
+  phrase; the fake goes silent, then serves an empty disc). Not run on a real disc.

@@ -27,6 +27,9 @@ pub const FORBIDDEN: &[(u8, u8)] = &[(0x02, 0x10), (0x02, 0x15), (0x02, 0x14), (
 /// out what they do with parameters (docs/next-steps.md).
 pub const EXPERIMENTAL: &[(u8, u8)] = &[(0x03, 0x01), (0x03, 0x03)];
 
+/// What [`Camera::format_disc`] must be given; a stray call can't format by accident.
+pub const FORMAT_CONFIRMATION: &str = "erase every photo and sound on this disc";
+
 pub const SPEED_CODES: [(u8, u32); 5] = [(0, 9600), (1, 19200), (2, 38400), (3, 57600), (4, 115200)];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -263,6 +266,34 @@ impl Camera {
 
     pub fn transact(&mut self, payload: &[u8]) -> Result<Vec<u8>, Error> {
         self.transact_timeout(payload, self.timeout)
+    }
+
+    /// Quick-format the disc (`02 10`, the camera menu's クイックフォーマット): **erases every photo
+    /// and sound on it.** Refused unless `confirmation` is exactly [`FORMAT_CONFIRMATION`], which
+    /// the app passes only after the user has confirmed three times. The camera says nothing for
+    /// about 50 seconds while it works; this waits (calling `tick` with seconds elapsed) until it
+    /// answers a status request again. Afterwards the camera must be switched off and on.
+    pub fn format_disc(&mut self, confirmation: &str, tick: &mut dyn FnMut(u64)) -> Result<(), Error> {
+        if confirmation != FORMAT_CONFIRMATION {
+            return Err(Error::Refused("02 10 (format) needs the explicit confirmation".into()));
+        }
+        let f = frame::encode(SEND_ADDR[self.idx], &[0x02, 0x10]);
+        self.trace(">", &f);
+        self.port.write_all(&f)?;
+        self.idx = (self.idx + 1) % SEND_ADDR.len();
+        let start = Instant::now();
+        loop {
+            let waited = start.elapsed().as_secs();
+            tick(waited);
+            if waited > 180 {
+                return Err(Error::Protocol("the camera hasn't answered for 3 minutes after starting the format".into()));
+            }
+            std::thread::sleep(Duration::from_secs(3));
+            if waited >= 3 && self.transact_timeout(&[0x03, 0x02], Duration::from_secs(2)).is_ok() {
+                tick(start.elapsed().as_secs());
+                return Ok(());
+            }
+        }
     }
 
     /// Send one of the [`EXPERIMENTAL`] commands with parameters. Anything else is refused.
@@ -638,6 +669,13 @@ mod tests {
         }
         // Outside transact_experimental, even 03 03 stays refused.
         assert!(cam.check_permitted(&[0x03, 0x03, 0x26]).is_err());
+    }
+
+    #[test]
+    fn format_needs_the_confirmation() {
+        let mut cam = Camera::new(Box::new(NullPort), None);
+        assert!(matches!(cam.format_disc("yes", &mut |_| {}), Err(Error::Refused(_))));
+        assert!(matches!(cam.transact(&[0x02, 0x10]), Err(Error::Refused(_))), "still forbidden everywhere else");
     }
 
     #[test]

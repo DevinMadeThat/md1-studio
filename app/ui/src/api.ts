@@ -197,6 +197,8 @@ export interface CameraContents {
   photos: CameraPhoto[];
   inLibrary: (LibraryMatch | null)[];
   discPath: string | null;
+  /** "diary": standard quality only; "free": fine allowed. */
+  albumMode: "diary" | "free" | null;
 }
 
 /** A library album: an ordered set of item keys, like a Lightroom collection. */
@@ -263,6 +265,9 @@ export const api = {
     invoke<CameraContents>("camera_add_photos", { sources, fine, fill }),
   cameraMark: (ids: string[], change: { rotateBy?: number; protect?: boolean }) =>
     invoke<CameraContents>("camera_mark", { ids, rotateBy: change.rotateBy ?? null, protect: change.protect ?? null }),
+  cameraDelete: (ids: string[]) => invoke<CameraContents>("camera_delete", { ids }),
+  cameraFormat: async () => invoke<void>("camera_format", { confirmation: await invoke<string>("format_confirmation") }),
+  deletePhotos: (items: { discPath: string; photoId: string }[]) => invoke<Disc[]>("delete_photos", { items }),
   getAlbums: () => invoke<{ albums: LibAlbum[] }>("get_albums"),
   saveAlbums: (albums: LibAlbum[]) => invoke<void>("save_albums", { data: { albums } }),
   saveFile: (path: string, base64: string) => invoke<void>("save_file", { path, base64 }),

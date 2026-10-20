@@ -78,6 +78,9 @@ mirrors `md1tool/md1.py`, which was proven on a real camera.
     block per photo, a single album on the disc); every file is read back and compared; the
     files the app writes are the photo first, then the indexes.
 
+* **Delete from the library**: the photo's files (PMP, sound, JPEG, WAV) go to the system Trash
+  (`trash` crate); its edits and import time are forgotten and it leaves any albums.
+
 Not in the app yet: restoring a whole disc from a backup (`md1tool/restore.py`), camera-side
 albums, and sound for uploaded photos.
 
@@ -90,8 +93,14 @@ albums, and sound for uploaded photos.
   which `author::write_files` turns on for the duration of a write the user confirmed;
 * `03 01` / `03 03` with parameters only through `transact_experimental` (used by `md1 try`);
 * `02 10` (format — it erased a disc once), `02 15` (delete picture), `02 14`, `02 09`, `02 02`
-  are refused unconditionally; so is any command not on the list, and any path payload over
-  96 bytes (firmware 1.14 hangs on ~138-byte paths).
+  are refused by the allowlist; so is any command not on the list, and any path payload over
+  96 bytes (firmware 1.14 hangs on ~138-byte paths). The one exception is
+  `Camera::format_disc`, which sends `02 10` only when given the exact confirmation phrase in
+  `camera::FORMAT_CONFIRMATION`; the UI asks three times (type FORMAT, then a 5-second countdown)
+  before it calls it, and the backend refuses below battery level 3.
+* Deleting photos on the camera doesn't use `02 15` (its argument was never pinned down: list
+  position or photo number); it removes the photo's index record and thumbnail block, writes the
+  indexes, then deletes `PSN`/`NRA` files with `02 08`. Protected photos are refused.
 
 Unit tests assert this, and the fake camera counts any dangerous command it receives.
 

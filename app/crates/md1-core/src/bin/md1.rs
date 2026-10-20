@@ -11,6 +11,8 @@
 //!   md1 add     PORT ALBUM IMAGE [fine] [fill]   (WRITES: add any picture to the album)
 //!   md1 mark    PORT ALBUM POSITION rotate N | protect on|off   (WRITES the album index;
 //!                                               N = quarter turns clockwise as shown, 0–3)
+//!   md1 del     PORT ALBUM POSITION...       (WRITES: remove photos from the album and disc)
+//!   md1 format  PORT "erase every photo and sound on this disc"   (ERASES THE DISC)
 //!   md1 try     PORT HEX...         (03 01 / 03 03 with parameters; status before and after)
 //!   md1 wav     FILE.PMA OUT.wav
 //!   md1 export  DISC_DIR OUT_DIR [SCALE]
@@ -120,6 +122,32 @@ fn run(args: &[String]) -> Result<(), Error> {
             })?;
             eprintln!("Written and verified. Switch the camera off and on to see the change.");
             let _ = cam.disconnect();
+        }
+        "del" => {
+            let mut cam = connect(arg(2)?)?;
+            let mut album = author::Album::read(&mut cam, arg(3)?)?;
+            let mut positions: Vec<usize> =
+                args[4..].iter().filter_map(|p| p.parse::<usize>().ok()).map(|p| p.saturating_sub(1)).collect();
+            positions.sort_unstable_by(|a, b| b.cmp(a));
+            let mut changes = author::Changes::default();
+            for pos in positions {
+                let n = album.remove_photo(pos)?;
+                eprintln!("removing photo {} (PSN{n:05})", pos + 1);
+                changes.deletes.push(format!("/PIC_MD/{}/PSN{n:05}.PMP", album.name));
+                changes.deletes.push(format!("/PIC_MD/{}/NRA{n:05}.PMA", album.name));
+            }
+            changes.writes = album.index_files();
+            author::apply_changes(&mut cam, &changes, &mut |p, k, n| {
+                eprintln!("{k}/{n} {p}");
+                Ok(())
+            })?;
+            eprintln!("Done. Switch the camera off and on to see the change.");
+            let _ = cam.disconnect();
+        }
+        "format" => {
+            let mut cam = connect(arg(2)?)?;
+            cam.format_disc(arg(3)?, &mut |s| eprint!("\rformatting… {s} s"))?;
+            eprintln!("\nFormatted. Switch the camera off and on.");
         }
         "try" => {
             let mut cam = connect(arg(2)?)?;

@@ -67,7 +67,7 @@ chosen photos, one library grouped by import day, matching of camera photos to t
 | Image info: **protect**, **caption** (14 chars) and edited date, written back to the camera | Protect: written to the camera (confirmed: the camera refuses to delete it; it shows no mark). Captions and dates stay in the library: the MD1's headers carry tag 0x11, not ALBUM's 0x12 caption, and the camera has no way to show text |
 | Rotate 90°/180°, stored in PIC_INF byte 5 | Written to the camera (confirmed; bits 2–3 count counter-clockwise turns); imports start out turned the same way |
 | **Copy To Camera**: any BMP/JPEG, fitted to 640 × 480, Fine or Snapshot | Done (`author.rs`): JPEG/PNG/TIFF/BMP/GIF/WebP or library photos with edits; fit or fill; standard or fine |
-| **Delete** pictures on the camera (`02 15`), skipping protected ones | Deliberately refused |
+| **Delete** pictures on the camera (`02 15`), skipping protected ones | Done without `02 15`: index edit + file delete, protected photos refused (tested on the camera) |
 | Albums with titles; new / rename / delete; **set album cover** | Library albums with covers (rename, delete, add/remove). Camera-side albums (`PIC0000n` + OV_INF titles) not written |
 | Find images by recorded / edited date (on, before, after) | Search box over captions, places, taken and import dates |
 | Print an image or a **contact sheet** (n per row) | Contact sheets as 300 dpi JPEG pages (Letter/A4, 3–6 per row, date/caption/file labels) |

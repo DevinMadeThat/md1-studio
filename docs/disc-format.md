@@ -151,6 +151,7 @@ File sizes: Standard ≈ 60–64 KB, Fine ≈ 106–128 KB (the camera budgets 6
 | `PIC_INF.PMF` | 0x104, 0x106, 0x10E (BE16 each) | picture count (three copies) |
 | `PIC_INF.PMF` | 0x50C + 16·i | picture record i (see above) |
 | `OV_INF.PMF` | 0x100 and 0x124 (BE16 each) | picture count of the album (two copies); album number at 0x120 (0001 for PIC00001, 0000 for PIC00000) |
+| `OV_INF.PMF` | 0x102 (BE16) | **album mode** (inferred): `0001` on the camera-formatted disc = Diary (the camera's default after formatting; standard quality only), `0002` on disc 2, which holds FINE photos = Free. The camera's menu switches Diary → Free one way only; we don't write this field |
 
 ## Adding a photo by hand (confirmed working)
 

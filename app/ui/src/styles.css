@@ -578,3 +578,6 @@ textarea.caption:focus { border-color: var(--accent); background: rgba(255, 255,
 .ss-count { color: #999; font-size: 12px; min-width: 52px; text-align: center; font-variant-numeric: tabular-nums; }
 .selbar { flex-wrap: wrap; row-gap: 6px; }
 .selbar .selcount, .selbar .linkish, .selbar .btn { white-space: nowrap; }
+.btn.danger { background: var(--danger); color: #fff; border-color: transparent; font-weight: 550; }
+.danger-link { color: var(--danger) !important; }
+.mode-tip { margin: 0 0 14px; }

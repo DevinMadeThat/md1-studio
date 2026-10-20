@@ -15,7 +15,7 @@ import { icon } from "./icons";
 import { hasLook, renderedUrl } from "./look";
 import { renderMap } from "./map";
 import { PhotoEditor } from "./photoEditor";
-import { esc, openModal, prefs, toast } from "./ui";
+import { confirmBox, esc, openModal, prefs, toast } from "./ui";
 import { ZoomStage, type ZoomShared } from "./zoom";
 
 // ---------------------------------------------------------------- state
@@ -68,6 +68,8 @@ const state = {
   writing: null as WriteEvent | null,
   /** The user has seen the "writing to the disc" explanation this session. */
   writeOk: false,
+  /** Seconds into a format of the camera's disc. */
+  formatting: null as number | null,
   /** The disc in the camera, seen through its thumbnails. */
   cam: {
     contents: null as CameraContents | null,
@@ -322,7 +324,14 @@ function drawCamera() {
   const strip = camStrip(cam);
 
   let body: string;
-  if (cs.browsing) {
+  if (state.formatting != null) {
+    const pct = Math.min(100, (state.formatting / 55) * 100);
+    body = `<div class="browse-wait">
+      <div><b>Formatting the disc…</b></div>
+      <div class="progress"><i style="width:${pct.toFixed(1)}%"></i></div>
+      <div class="muted small">${state.formatting} s · the camera takes about 50 seconds and doesn't answer meanwhile. Don't switch it off.</div>
+    </div>`;
+  } else if (cs.browsing) {
     const pct = cs.total ? Math.min(100, (cs.done / cs.total) * 100) : 0;
     body = `<div class="browse-wait">
       <div class="muted">Reading the camera's thumbnails…</div>
@@ -341,7 +350,9 @@ function drawCamera() {
 
   let bar = "";
   const w = state.writing;
-  if (w) {
+  if (state.formatting != null) {
+    bar = "";
+  } else if (w) {
     bar = `<div class="actionbar">
       <div class="ab-progress">
         <div class="progress"><i style="width:${w.count ? ((w.index - 1) / w.count) * 100 : 3}%"></i></div>
@@ -375,11 +386,15 @@ function drawCamera() {
         <button class="btn small icon-btn" data-action="cam-rotate-left" title="Rotate left on the camera">${icon.rotateLeft(14)}</button>
         <button class="btn small icon-btn" data-action="cam-rotate-right" title="Rotate right on the camera">${icon.rotateRight(14)}</button>
         <button class="btn small" data-action="cam-protect" title="Protect (or unprotect) on the camera">${icon.lock(13)} ${chosen.every((r) => r.p.protected) ? "Unprotect" : "Protect"}</button>
+        <button class="btn small icon-btn danger-text" data-action="cam-delete" title="Delete from the camera">${icon.trash(14)}</button>
       </div>` : ""}
       <button class="btn primary" data-action="download" ${target.length ? "" : "disabled"}>${icon.download(15)} ${chosen.length ? `Download ${plural(chosen.length, "photo")}` : fresh.length ? `Download ${fresh.length} new` : "Download"}</button>
     </div>`;
   }
 
+  const tip = cs.contents?.albumMode === "diary"
+    ? `<div class="callout small mode-tip">This disc is in <b>Diary mode</b>, so the camera takes standard-quality photos only. For <b>FINE</b> photos, switch it on the camera: MENU → 準備 (Setup) → アルバムモード (Album mode) → フリーモード (Free mode) → 実行. It can't be switched back.</div>`
+    : "";
   const head = cs.contents && rows.length
     ? `<h3 class="album-head">On the camera <span class="muted">${plural(rows.length, "photo")}${rows.length - fresh.length ? ` · ${rows.length - fresh.length} already in your library` : ""}</span>
          <button class="linkish refresh-link" data-action="browse-refresh" ${imp?.running || state.writing ? "disabled" : ""}>${icon.refresh(12)} Refresh</button>
@@ -390,10 +405,10 @@ function drawCamera() {
   $("#main").innerHTML = `
     <header class="toolbar" data-drag>
       <div class="tb-title">Camera <span class="tb-sub">DSC-MD1 · firmware ${esc(cam.connection.camera_id.trim().split(/\s+/).pop())}</span></div>
-      <button class="btn" data-action="disconnect" ${imp?.running || cs.browsing || state.writing ? "disabled" : ""}>Disconnect</button>
+      <button class="btn" data-action="disconnect" ${imp?.running || cs.browsing || state.writing || state.formatting != null ? "disabled" : ""}>Disconnect</button>
     </header>
     ${strip}
-    <div class="page cam-page">${head}${body}</div>
+    <div class="page cam-page">${state.formatting == null ? tip + head : ""}${body}</div>
     ${bar}`;
 }
 
@@ -402,8 +417,10 @@ function camStrip(cam: CameraInfo) {
   return `<div class="camstrip">
       <span title="Battery">${powerBar(cam.status.power)}${cam.status.power < 3 ? ` <span class="warn-text">low</span>` : ""}</span>
       <span><span class="muted">Mode</span> ${esc(cam.status.mode_name)}</span>
-      <span><span class="muted">Clock</span> ${cam.status.clock_set ? esc(cam.status.clock) : "not set"}</span>
+      <span><span class="muted">Clock</span> ${cam.status.clock_set ? esc(cam.status.clock) : "not set"} <button class="linkish" data-action="clock-help">How to set</button></span>
       ${v ? `<span><span class="muted">Disc</span> ${esc(v.label || "unlabelled")} · ${fmtBytes(v.free_bytes)} free</span>` : ""}
+      ${state.cam.contents?.albumMode ? `<span title="${state.cam.contents.albumMode === "free" ? "Free mode: the camera can take FINE photos" : "Diary mode: standard-quality photos only"}"><span class="muted">Album mode</span> ${state.cam.contents.albumMode === "free" ? "Free" : "Diary"}</span>` : ""}
+      <button class="linkish danger-link" data-action="format-disc" ${state.imp?.running || state.writing || state.cam.browsing ? "disabled" : ""}>Format disc…</button>
       <span class="spacer"></span>
       <span class="muted small">${esc(cam.connection.port.replace("/dev/", ""))} · ${cam.connection.baud.toLocaleString()} baud</span>
     </div>`;
@@ -552,6 +569,7 @@ function drawGrid() {
       <button class="btn small" data-action="sel-album" title="Add to an album">${icon.photos(14)} Album…</button>
       ${al ? `<button class="btn small" data-action="sel-unalbum">Remove from album</button>` : ""}
       ${state.camera ? `<button class="btn small" data-action="sel-to-camera" title="Copy these photos onto the disc in the camera">${icon.camera(14)} To camera…</button>` : ""}
+      <button class="btn small icon-btn danger-text" data-action="sel-delete" title="Delete from the library (⌫)">${icon.trash(14)}</button>
       <span class="spacer"></span>
       <button class="linkish" data-action="select-all">Select all</button>
       <button class="linkish" data-action="clear-selection">Clear</button>
@@ -742,6 +760,7 @@ function renderViewer(navigated: boolean) {
           ${state.camera ? `<button class="btn icon-btn" data-v="to-camera" title="Send to the camera">${icon.camera(15)}</button>` : ""}
           ${currentAlbum() ? `<button class="btn icon-btn" data-v="cover" title="Use as the album's cover">${icon.photos(15)}</button>` : ""}
           <button class="btn icon-btn" data-v="reveal" title="Show the file">${icon.finder(15)}</button>
+          <button class="btn icon-btn danger-text" data-v="delete" title="Delete from the library (⌫)">${icon.trash(15)}</button>
         </div>
 
         <div class="v-bottom">
@@ -1196,6 +1215,125 @@ async function markOnCamera(change: { rotateBy?: number; protect?: boolean }) {
   await runCameraWrite(() => api.cameraMark(ids, change), `${what} ${plural(ids.length, "photo")} on the camera. Switch it off and on to see the change.`);
 }
 
+// ---------------------------------------------------------------- deleting and formatting
+
+/** Move library photos to the system Trash (after asking). */
+async function deleteFromLibrary(items: Item[]) {
+  if (!items.length) return;
+  const n = items.length;
+  const ok = await confirmBox(
+    `Delete ${plural(n, "photo")} from the library?`,
+    `<p class="small">${n === 1 ? "The photo moves" : "They move"} to the Trash with ${n === 1 ? "its" : "their"} sound, and come${n === 1 ? "s" : ""} out of any albums. You can put ${n === 1 ? "it" : "them"} back from the Trash; edits like places and captions are forgotten.
+     ${state.camera ? "Nothing on the camera changes." : "If the disc still has them, you can download them again."}</p>`,
+    "Move to Trash",
+    { danger: true },
+  );
+  if (!ok) return;
+  try {
+    const discs = await api.deletePhotos(items.map((it) => ({ discPath: it.disc.path, photoId: it.photo.id })));
+    applyDiscs(discs);
+    const gone = new Set(items.map((it) => it.key));
+    let changed = false;
+    for (const al of state.albums) {
+      const before = al.items.length;
+      al.items = al.items.filter((k) => !gone.has(k));
+      if (al.cover && gone.has(al.cover)) al.cover = al.items[0] ?? null;
+      changed ||= al.items.length !== before;
+    }
+    if (changed) await saveAlbums();
+    gone.forEach((k) => state.selection.delete(k));
+    if (viewer.open) {
+      viewer.list = viewer.source();
+      if (!viewer.list.length) closeViewer();
+      else { viewer.index = Math.min(viewer.index, viewer.list.length - 1); renderViewer(true); }
+    }
+    if (state.cam.contents) state.cam.contents = await api.browseCamera(false).catch(() => state.cam.contents);
+    render();
+    toast(`Moved ${plural(n, "photo")} to the Trash.`);
+  } catch (e) {
+    toast(`Couldn't delete: ${e}`, undefined, "error");
+  }
+}
+
+async function deleteOnCamera() {
+  const rows = cameraRows().filter((r) => state.cam.selection.has(r.p.id));
+  const locked = rows.filter((r) => r.p.protected);
+  const target = rows.filter((r) => !r.p.protected);
+  if (!target.length) { toast("Those photos are protected. Unprotect them first.", undefined, "error"); return; }
+  const missing = target.filter((r) => !r.inLib);
+  const ok = await confirmBox(
+    `Delete ${plural(target.length, "photo")} from the camera?`,
+    `<p class="small">They're removed from the disc in the camera, with their sound. <b>This can't be undone.</b></p>
+     ${missing.length ? `<div class="callout error small"><b>${missing.length} of these ${missing.length === 1 ? "photo isn't" : "photos aren't"} in your library.</b> ${missing.length === 1 ? "It" : "They"} will be gone for good. Download ${missing.length === 1 ? "it" : "them"} first if you want to keep ${missing.length === 1 ? "it" : "them"}.</div>` : `<p class="small muted">All of them are already in your library.</p>`}
+     ${locked.length ? `<p class="small muted">${plural(locked.length, "protected photo")} will be left alone.</p>` : ""}
+     ${state.camera && state.camera.status.power < 5 ? `<p class="small muted">The camera is on battery; the AC adapter is safer for writing.</p>` : ""}`,
+    `Delete ${plural(target.length, "photo")}`,
+    { danger: true, type: missing.length ? "DELETE" : undefined },
+  );
+  if (!ok) return;
+  state.writeOk = true;
+  const ids = target.map((r) => r.p.id);
+  ids.forEach((id) => state.cam.selection.delete(id));
+  await runCameraWrite(() => api.cameraDelete(ids), `Deleted ${plural(ids.length, "photo")} from the camera. Switch it off and on to see the change.`);
+}
+
+/** Three separate confirmations, then the camera's quick format (about 50 seconds). */
+async function formatDisc() {
+  const cam = state.camera;
+  if (!cam) return;
+  const rows = cameraRows();
+  const missing = rows.filter((r) => !r.inLib).length;
+  const first = await confirmBox(
+    "Format the disc in the camera?",
+    `<p class="small">Formatting <b>erases everything on the MiniDisc</b>: ${rows.length ? `all ${plural(rows.length, "photo")}, their sound, and the albums` : "every photo, sound and album"}. It's the same as the camera's own MENU → 準備 → フォーマット.</p>
+     ${missing ? `<div class="callout error small"><b>${plural(missing, "photo")} on this disc ${missing === 1 ? "isn't" : "aren't"} in your library.</b> Download ${missing === 1 ? "it" : "them"}, or use “Back up the whole disc” on this screen, before formatting.</div>` : rows.length ? `<p class="small muted">Every photo on this disc is in your library.</p>` : ""}
+     <p class="small muted">Afterwards the disc is in Diary mode (standard quality only) until you switch it to Free mode on the camera.</p>`,
+    "Continue…",
+    { danger: true },
+  );
+  if (!first) return;
+  const second = await confirmBox(
+    "Are you sure?",
+    `<p class="small">There's no undo. ${missing ? `<b>${plural(missing, "photo")} will be lost.</b>` : ""}</p>`,
+    "Continue…",
+    { danger: true, type: "FORMAT" },
+  );
+  if (!second) return;
+  const third = await confirmBox(
+    "Last chance",
+    `<p class="small">Erase the disc now? Keep the camera switched on until it's done (about 50 seconds).${cam.status.power < 5 ? " It's on battery: the AC adapter is safer." : ""}</p>`,
+    "Erase the disc",
+    { danger: true, countdown: 5, cancel: "Don't format" },
+  );
+  if (!third) return;
+  state.formatting = 0;
+  state.cam.selection.clear();
+  renderCamera();
+  try {
+    await api.cameraFormat();
+    toast("The disc is formatted. Switch the camera off and on, then connect again.");
+    await api.disconnect().catch(() => {});
+    resetCamera();
+  } catch (e) {
+    toast(`Formatting failed: ${e}`, undefined, "error");
+  } finally {
+    state.formatting = null;
+    render();
+  }
+}
+
+function clockHelp() {
+  const m = openModal(
+    "Setting the camera's clock",
+    `<p class="small">The clock can only be set on the camera itself: no command over the cable sets it (we tried several; see the project's lab notebook).</p>
+     <ol class="small steps"><li>MENU → 準備 (Setup) → <b>日時設定</b> (Date/time set).</li>
+       <li>Turn the jog dial to change each field, press it to go to the next. The clock starts after the minutes.</li></ol>
+     <p class="small muted">The camera's small backup battery is probably flat, so it forgets the time whenever the main battery comes out. For photos taken with the clock unset, set their dates in the library (Date &amp; time… → “Keep the time between shots”).</p>
+     <div class="modal-actions"><span class="spacer"></span><button class="btn primary" id="ch-ok">OK</button></div>`,
+  );
+  m.el.querySelector("#ch-ok")!.addEventListener("click", m.close);
+}
+
 // ---------------------------------------------------------------- clipboard
 
 /** Put the photo (with its edits) on the clipboard as a PNG. */
@@ -1292,6 +1430,7 @@ document.addEventListener("click", async (e) => {
         break;
       }
       case "to-camera": if (it) sendToCamera([{ discPath: it.disc.path, photoId: it.photo.id }]); break;
+      case "delete": if (it) deleteFromLibrary([it]); break;
       case "slideshow": if (it) { const list = viewer.list; const i = viewer.index; closeViewer(); startSlideshow(list, i); } break;
       case "reveal": if (it) revealItemInDir(it.photo.jpegPath ?? it.photo.pmpPath); break;
       case "edit-location": if (it) openLocationEditor([it], viewerDiscsUpdated); break;
@@ -1464,6 +1603,10 @@ document.addEventListener("click", async (e) => {
       openContactSheet(list, viewTitle());
       break;
     }
+    case "sel-delete": deleteFromLibrary(selectedItems()); break;
+    case "cam-delete": deleteOnCamera(); break;
+    case "format-disc": formatDisc(); break;
+    case "clock-help": clockHelp(); break;
     case "cam-rotate-left": markOnCamera({ rotateBy: -1 }); break;
     case "cam-rotate-right": markOnCamera({ rotateBy: 1 }); break;
     case "cam-protect": {
@@ -1530,6 +1673,7 @@ document.addEventListener("keydown", (e) => {
       return;
     }
     if (e.key === "Escape" && state.selection.size) { state.selection.clear(); render(); }
+    if ((e.key === "Backspace" || e.key === "Delete") && state.selection.size) { e.preventDefault(); deleteFromLibrary(selectedItems()); }
     if ((e.metaKey || e.ctrlKey) && e.key === "a") {
       e.preventDefault();
       visibleItems().forEach((it) => state.selection.add(it.key));
@@ -1554,6 +1698,7 @@ document.addEventListener("keydown", (e) => {
   else if (e.key === "0") { e.preventDefault(); z?.reset(); }
   else if (e.key === "e" || e.key === "E") { e.preventDefault(); openEditor(); }
   else if ((e.metaKey || e.ctrlKey) && e.key === "c") { e.preventDefault(); const it = viewerItem(); if (it) copyToClipboard(it); }
+  else if (e.key === "Backspace" || e.key === "Delete") { e.preventDefault(); const it = viewerItem(); if (it) deleteFromLibrary([it]); }
   else if (e.key === "f" || e.key === "F") document.querySelector<HTMLButtonElement>('[data-v="favorite"]')?.click();
   else if (e.key === "[" || e.key === "]") document.querySelector<HTMLButtonElement>(`[data-v="${e.key === "[" ? "rotate-left" : "rotate-right"}"]`)?.click();
 });
@@ -1604,6 +1749,10 @@ async function init() {
     if (state.view.kind === "camera") renderCamera();
   });
   state.albums = (await api.getAlbums()).albums ?? [];
+  await listen<number>("format-event", (e) => {
+    state.formatting = e.payload;
+    if (state.view.kind === "camera") renderCamera();
+  });
   state.settings = await api.settings();
   await Promise.all([refreshDiscs(), refreshPorts()]);
   state.view = state.discs.length ? { kind: "library" } : { kind: "camera" };

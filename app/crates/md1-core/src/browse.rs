@@ -56,6 +56,9 @@ pub struct CameraPhoto {
 pub struct CameraDisc {
     pub fingerprint: String,
     pub label: String,
+    /// "diary" (standard quality only, space kept for sound) or "free" (fine allowed), from
+    /// `OV_INF.PMF` bytes 0x102–0x103 (1 / 2; inferred from a diary disc and a free one).
+    pub album_mode: Option<&'static str>,
     pub photos: Vec<CameraPhoto>,
     /// Every file and folder on the disc (for a later download).
     #[serde(skip)]
@@ -175,7 +178,13 @@ pub fn browse(
     }
 
     let photos = photos_from(&tree, &files);
+    let album_mode = files.get("/PIC_MD/OV_INF.PMF").and_then(|d| d.get(0x102..0x104)).and_then(|b| match b {
+        [0, 1] => Some("diary"),
+        [0, 2] => Some("free"),
+        _ => None,
+    });
     Ok(CameraDisc {
+        album_mode,
         fingerprint: volume.as_ref().map(|v| v.fingerprint()).unwrap_or_default(),
         label: volume.as_ref().map(|v| v.label.clone()).unwrap_or_default(),
         photos,

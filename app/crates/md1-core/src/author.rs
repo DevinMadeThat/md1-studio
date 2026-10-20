@@ -1,5 +1,5 @@
-//! Writing to the disc in the camera: new photos (any JPEG, converted to the camera's format)
-//! and changes to existing ones (rotation, protect) in the album index.
+//! Writing to the disc in the camera: new photos (any JPEG, converted to the camera's format),
+//! changes to existing ones (rotation, protect) in the album index, and removing photos.
 //!
 //! The MD1 refuses Sony's "add picture" command (`02 14`), so a new photo is added the way
 //! `md1tool/add_photo.py` proved on the hardware: write `PSNnnnnn.PMP`, append a thumbnail block
@@ -248,6 +248,29 @@ impl Album {
         Ok((format!("PSN{next:05}.PMP"), make_pmp(frame, fine)))
     }
 
+    /// Take a photo out of the album: its record, its thumbnail block and the counts. Returns its
+    /// PSN number; the caller deletes `PSNnnnnn.PMP` (and `NRAnnnnn.PMA`) after writing the
+    /// indexes. Protected photos are refused, as the camera itself refuses them.
+    pub fn remove_photo(&mut self, position: usize) -> Result<u16, Error> {
+        let n = self.count() as usize;
+        let rec = self.record(position)?.to_vec();
+        if rec[14] & 1 == 1 {
+            return Err(Error::Refused(format!("photo {} is protected; unprotect it first", position + 1)));
+        }
+        let at = PIC_INF_RECORDS + 16 * position;
+        self.pic_inf.drain(at..at + 16);
+        for o in PIC_INF_COUNTS {
+            self.pic_inf[o..o + 2].copy_from_slice(&((n - 1) as u16).to_be_bytes());
+        }
+        let body = (self.pic_inf.len() - 0x100) as u32;
+        self.pic_inf[0x0C..0x10].copy_from_slice(&body.to_be_bytes());
+        for o in OV_INF_COUNTS {
+            self.ov_inf[o..o + 2].copy_from_slice(&((n - 1) as u16).to_be_bytes());
+        }
+        self.pidx.drain(PMX_BLOCK * position..PMX_BLOCK * (position + 1));
+        Ok(be16(&rec, 2))
+    }
+
     /// The index files to write back, in the order the camera should see them.
     pub fn index_files(&self) -> Vec<(String, Vec<u8>)> {
         let base = format!("/PIC_MD/{}", self.name);
@@ -257,6 +280,36 @@ impl Album {
             ("/PIC_MD/OV_INF.PMF".to_string(), self.ov_inf.clone()),
         ]
     }
+}
+
+/// What to change on the camera: files to write (each read back), then files to delete.
+#[derive(Default)]
+pub struct Changes {
+    pub writes: Vec<(String, Vec<u8>)>,
+    pub deletes: Vec<String>,
+}
+
+/// Write, verify, then delete. Indexes are written before files are deleted, so if anything
+/// stops halfway the camera's index never lists a file that's gone.
+pub fn apply_changes(
+    cam: &mut Camera,
+    changes: &Changes,
+    on_file: &mut dyn FnMut(&str, usize, usize) -> Result<(), Error>,
+) -> Result<(), Error> {
+    let total = changes.writes.len() + changes.deletes.len();
+    write_files(cam, &changes.writes, &mut |p, k, _| on_file(p, k, total))?;
+    cam.set_writes_enabled(true);
+    let result = (|| {
+        for (k, path) in changes.deletes.iter().enumerate() {
+            on_file(path, changes.writes.len() + k + 1, total)?;
+            if cam.stat(path)?.is_some() {
+                cam.delete_file(path)?;
+            }
+        }
+        Ok(())
+    })();
+    cam.set_writes_enabled(false);
+    result
 }
 
 /// Write files to the camera and read each one back. Needs power level 3 or more (Sony's own
@@ -325,6 +378,38 @@ mod tests {
         assert_eq!(rec.rotation_cw(), 1);
         album.set_protected(0, true).unwrap();
         assert!(formats::parse_pic_inf(&album.pic_inf).unwrap().records[0].protected);
+    }
+
+    #[test]
+    fn remove_photo_keeps_the_album_consistent() {
+        let n = 3usize;
+        let mut pic_inf = vec![0u8; PIC_INF_RECORDS];
+        pic_inf[..4].copy_from_slice(&[0x10, 0x12, 0x01, 0x00]);
+        for k in 0..n {
+            let mut r = [0u8; 16];
+            r[1] = 1;
+            r[3] = k as u8 + 10;
+            r[4] = 1;
+            pic_inf.extend_from_slice(&r);
+        }
+        for o in PIC_INF_COUNTS {
+            pic_inf[o + 1] = n as u8;
+        }
+        let mut ov_inf = vec![0u8; 0x150];
+        ov_inf[0x121] = 1;
+        for o in OV_INF_COUNTS {
+            ov_inf[o + 1] = n as u8;
+        }
+        let pidx: Vec<u8> = (0..n).flat_map(|k| vec![k as u8; PMX_BLOCK]).collect();
+        let mut album = Album { name: "PIC00001".into(), pic_inf, pidx, ov_inf };
+        album.check().unwrap();
+        assert_eq!(album.remove_photo(1).unwrap(), 11);
+        album.check().unwrap();
+        let numbers: Vec<u16> = formats::parse_pic_inf(&album.pic_inf).unwrap().records.iter().map(|r| r.number).collect();
+        assert_eq!(numbers, vec![10, 12]);
+        assert_eq!((album.pidx[0], album.pidx[PMX_BLOCK]), (0, 2), "thumbnail block 1 removed");
+        album.set_protected(0, true).unwrap();
+        assert!(album.remove_photo(0).is_err(), "protected photos stay");
     }
 
     #[test]

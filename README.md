@@ -49,14 +49,20 @@ over its serial port and provides:
 * Or **back up the whole disc** byte for byte (every file, including the index files), so it
   can be restored later.
 * Decodes the camera's **sound recordings** (mono ATRAC1) to WAV.
-* **Safe by design.** Downloading only ever reads. The app refuses to send the firmware's
-  format and delete commands at all (see [Be careful with your disc](#be-careful-with-your-disc)).
+* **Safe by design.** Downloading only ever reads. Anything that changes the disc asks first
+  (see [Be careful with your disc](#be-careful-with-your-disc)).
 
-**Putting pictures on the camera** (asks first; every file written is read back to check it)
+**Managing the camera's disc** (asks first; every file written is read back to check it)
 * **Send any picture to the camera**: library photos (with your edits) or JPEG, PNG, TIFF, BMP,
   GIF and WebP files, fitted or cropped to 640 × 480 at standard or fine quality, added to the
   end of the album like photos the camera took.
-* **Rotate or protect photos on the camera**, in the camera's own album index.
+* **Rotate, protect or delete photos on the camera**, in the camera's own album index. Deleting
+  warns you (and makes you type DELETE) if a photo isn't in your library yet; protected photos
+  are left alone.
+* **Format the disc**, behind three separate confirmations.
+* Shows the disc's **album mode** (Diary: standard quality only; Free: FINE allowed) and how to
+  switch it on the camera, and how to set the camera's clock (the cable can't).
+* **Delete photos from the library** (to the Trash).
 
 **Browsing**
 * **One library** of every photo you've downloaded, like Lightroom or Apple Photos: All Photos,
@@ -185,9 +191,10 @@ Already have a backup made with the Python tools? Use **Add backup folder…** i
 
 ⚠️ The camera obeys commands without asking for confirmation, and one of them, `02 10`, **formats
 the disc**. We found that out by erasing one (luckily it was restored from a backup made minutes
-earlier). The app and `md1tool` refuse to send it. The app writes to the disc only when you send
-pictures to the camera or rotate or protect photos there, and only after asking. Use the AC
-adapter for that if you can. Before you try anything experimental yourself, make a full copy of
+earlier). `md1tool` refuses to send it. The app sends it only from **Format disc…**, after three
+confirmations (one where you type FORMAT, one with a countdown). Otherwise the app writes to the
+disc only when you send pictures, or rotate, protect or delete photos there, and only after
+asking. Use the AC adapter for writing if you can. Before you try anything experimental yourself, make a full copy of
 the disc first (**Back up the whole disc** on the camera screen). See
 [docs/protocol.md → Firmware hazards](docs/protocol.md#firmware-hazards-confirmed).
 

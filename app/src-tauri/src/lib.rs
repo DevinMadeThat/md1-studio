@@ -10,6 +10,7 @@ use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
 use md1_core::browse::{self, BrowseEvent, CameraDisc, CameraPhoto};
+use md1_core::author::Changes;
 use md1_core::camera::{self, Camera, Connection, Status, VolumeInfo};
 use md1_core::edits::{self, EditPatch};
 use md1_core::import::{self, DiscMeta, ImportEvent, ImportOptions};
@@ -287,6 +288,8 @@ struct CameraContents {
     in_library: Vec<Option<LibraryMatch>>,
     /// The library folder that downloads from this disc go into, if it exists yet.
     disc_path: Option<String>,
+    /// "diary" (standard quality only) or "free" (fine allowed).
+    album_mode: Option<&'static str>,
 }
 
 fn contents(app: &AppHandle, b: &CameraDisc) -> CameraContents {
@@ -295,6 +298,7 @@ fn contents(app: &AppHandle, b: &CameraDisc) -> CameraContents {
         in_library: library::match_camera(&discs, b),
         photos: b.photos.clone(),
         disc_path: matching_disc(app, &b.volume),
+        album_mode: b.album_mode,
     }
 }
 
@@ -419,10 +423,8 @@ struct WriteEvent {
     count: usize,
 }
 
-/// Files to write to the camera: (camera path, contents), in write order.
-type CameraFiles = Vec<(String, Vec<u8>)>;
-/// Edits an album in memory and says which files to write.
-type AlbumWork<'a> = dyn FnMut(&mut md1_core::author::Album, &[CameraPhoto]) -> Result<CameraFiles, String> + 'a;
+/// Edits an album in memory and says which files to write and delete.
+type AlbumWork<'a> = dyn FnMut(&mut md1_core::author::Album, &[CameraPhoto]) -> Result<Changes, String> + 'a;
 
 /// Run `work` on the connected camera's only album, write what it returns, and browse again.
 fn write_album(
@@ -446,11 +448,18 @@ fn write_album(
     };
     let mut album = md1_core::author::Album::from_browsed(b, &name).map_err(err)?;
     let photos = b.photos.clone();
-    let files = work(&mut album, &photos)?;
+    let changes = work(&mut album, &photos)?;
     let emit_app = app.clone();
-    let result = md1_core::author::write_files(&mut session.cam, &files, &mut |path, index, count| {
+    let deleting: Vec<String> = changes.deletes.clone();
+    let result = md1_core::author::apply_changes(&mut session.cam, &changes, &mut |path, index, count| {
         let name = path.rsplit('/').next().unwrap_or(path);
-        let label = if name.starts_with("PSN") { format!("Writing photo {name}") } else { format!("Updating {name}") };
+        let label = if deleting.iter().any(|d| d == path) {
+            format!("Deleting {name}")
+        } else if name.starts_with("PSN") {
+            format!("Writing photo {name}")
+        } else {
+            format!("Updating {name}")
+        };
         let _ = emit_app.emit("write-event", WriteEvent { label, index, count });
         Ok(())
     });
@@ -475,13 +484,13 @@ async fn camera_add_photos(app: AppHandle, sources: Vec<AddSource>, fine: bool, 
             .map(|s| source_image(s).map(|img| md1_core::author::to_camera_frame(&img, fill)))
             .collect::<Result<_, _>>()?;
         write_album(&app, &mut |album, _| {
-            let mut photos = Vec::new();
+            let mut writes = Vec::new();
             for f in &frames {
                 let (name, pmp) = album.add_photo(f, fine).map_err(err)?;
-                photos.push((format!("/PIC_MD/{}/{name}", album.name), pmp));
+                writes.push((format!("/PIC_MD/{}/{name}", album.name), pmp));
             }
-            photos.extend(album.index_files());
-            Ok(photos)
+            writes.extend(album.index_files());
+            Ok(Changes { writes, deletes: vec![] })
         })
     })
     .await
@@ -505,8 +514,103 @@ async fn camera_mark(app: AppHandle, ids: Vec<String>, rotate_by: Option<i8>, pr
                     album.set_protected(p.position, on).map_err(err)?;
                 }
             }
-            Ok(album.index_files().into_iter().filter(|(p, _)| p.ends_with("PIC_INF.PMF")).collect())
+            let writes = album.index_files().into_iter().filter(|(p, _)| p.ends_with("PIC_INF.PMF")).collect();
+            Ok(Changes { writes, deletes: vec![] })
         })
+    })
+    .await
+    .map_err(err)?
+}
+
+/// Remove photos from the camera's album and delete their files (and sound). Protected photos
+/// are refused.
+#[tauri::command]
+async fn camera_delete(app: AppHandle, ids: Vec<String>) -> CmdResult<CameraContents> {
+    tauri::async_runtime::spawn_blocking(move || {
+        write_album(&app, &mut |album, photos| {
+            let mut chosen: Vec<&CameraPhoto> =
+                ids.iter().map(|id| photos.iter().find(|p| &p.id == id).ok_or("photo not on the camera")).collect::<Result<_, _>>()?;
+            if let Some(p) = chosen.iter().find(|p| !p.in_index) {
+                return Err(format!("{} isn't in the album index", p.stem));
+            }
+            // Highest position first, so the earlier positions stay valid.
+            chosen.sort_by_key(|p| std::cmp::Reverse(p.position));
+            let mut deletes = Vec::new();
+            for p in chosen {
+                album.remove_photo(p.position).map_err(err)?;
+                deletes.push(p.path.clone());
+                deletes.extend(p.sound_path.clone());
+            }
+            Ok(Changes { writes: album.index_files(), deletes })
+        })
+    })
+    .await
+    .map_err(err)?
+}
+
+/// Quick-format the disc in the camera. The frontend asks three times before calling this, and
+/// passes md1-core's confirmation phrase; the camera works silently for about 50 seconds.
+#[tauri::command]
+async fn camera_format(app: AppHandle, confirmation: String) -> CmdResult<()> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<AppState>();
+        let mut slot = state.session.lock().unwrap();
+        let session = slot.as_mut().ok_or("The camera is not connected.")?;
+        if session.cam.status().map_err(err)?.power < 3 {
+            return Err("The camera's battery is too low to format safely; use the AC adapter.".into());
+        }
+        let emit_app = app.clone();
+        let result = session.cam.format_disc(&confirmation, &mut |s| {
+            let _ = emit_app.emit("format-event", s);
+        });
+        session.browsed = None;
+        session.volume = None;
+        result.map_err(err)
+    })
+    .await
+    .map_err(err)?
+}
+
+/// The confirmation phrase `camera_format` needs (kept in md1-core, shown to no one).
+#[tauri::command]
+fn format_confirmation() -> &'static str {
+    camera::FORMAT_CONFIRMATION
+}
+
+/// Move library photos (and their JPEG, sound and WAV copies) to the system Trash. Returns the
+/// updated discs.
+#[tauri::command]
+async fn delete_photos(items: Vec<ExportItem>) -> CmdResult<Vec<Disc>> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let mut touched: Vec<PathBuf> = Vec::new();
+        let mut files: Vec<PathBuf> = Vec::new();
+        for it in &items {
+            let dir = PathBuf::from(&it.disc_path);
+            let disc = library::scan_disc(&dir).ok_or("disc folder not found")?;
+            let p = find_photo(&disc, &it.photo_id).ok_or("photo not found")?;
+            let pmp = PathBuf::from(&p.pmp_path);
+            files.push(pmp.clone());
+            files.push(pmp.with_file_name(format!("NRA{:05}.PMA", p.number)));
+            files.extend(p.jpeg_path.as_ref().map(PathBuf::from));
+            files.extend(p.wav_path.as_ref().map(PathBuf::from));
+            if !touched.contains(&dir) {
+                touched.push(dir);
+            }
+        }
+        let existing: Vec<PathBuf> = files.into_iter().filter(|f| f.exists()).collect();
+        trash::delete_all(&existing).map_err(|e| format!("Couldn't move to the Trash: {e}"))?;
+        for dir in &touched {
+            // Forget their edits and import times, so a re-download starts fresh.
+            let ids: Vec<&str> = items.iter().filter(|it| Path::new(&it.disc_path) == dir).map(|it| it.photo_id.as_str()).collect();
+            let mut e = edits::load(dir);
+            e.retain(|k, _| !ids.contains(&k.as_str()));
+            edits::save(dir, &e).map_err(err)?;
+            if let Some(mut meta) = DiscMeta::load(dir) {
+                meta.photo_imports.retain(|k, _| !ids.contains(&k.as_str()));
+                meta.save(dir).map_err(err)?;
+            }
+        }
+        Ok(touched.iter().filter_map(|d| library::scan_disc(d)).collect())
     })
     .await
     .map_err(err)?
@@ -868,6 +972,10 @@ pub fn run() {
             download_photos,
             camera_add_photos,
             camera_mark,
+            camera_delete,
+            camera_format,
+            format_confirmation,
+            delete_photos,
             get_albums,
             save_albums,
             save_file,

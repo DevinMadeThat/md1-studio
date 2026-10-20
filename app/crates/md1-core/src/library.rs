@@ -334,6 +334,7 @@ mod tests {
         let cam = CameraDisc {
             fingerprint: String::new(),
             label: String::new(),
+            album_mode: None,
             photos: vec![
                 // Same size and time: the same photo.
                 on_camera("PIC00001/PSN00000", 63796, "1980-01-01 00:05:54"),
