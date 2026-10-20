@@ -34,6 +34,8 @@ over its serial port and provides:
 </tr>
 </table>
 
+![Help: how-to topics, a search over the camera's menus in English, and the cheat sheets](docs/images/screenshot-help.jpg)
+
 <sub>The screenshots use public-domain sample photos ([credits](docs/images/CREDITS.md)) and made-up sounds.</sub>
 
 ## Features
@@ -42,8 +44,9 @@ over its serial port and provides:
 * Finds the camera automatically and switches the link to its top speed (115,200 baud, about
   10 seconds a photo).
 * **Shows what's on the camera before downloading anything**, using the camera's own
-  thumbnails (a whole disc's worth in seconds). Photos already in your library are marked, even
-  if they came from another disc or a restored copy.
+  thumbnails (a few seconds per photo the first time, instant for a disc it has seen before;
+  you can also choose to load them only when you ask). Photos already in your library are
+  marked, even if they came from another disc or a restored copy.
 * **Download just the new photos, or pick a few** (click, shift-click for a range). Their sound
   comes with them.
 * Or **back up the whole disc** byte for byte (every file, including the index files), so it
@@ -59,7 +62,8 @@ over its serial port and provides:
 * **Rotate, protect or delete photos on the camera**, in the camera's own album index. Deleting
   warns you (and makes you type DELETE) if a photo isn't in your library yet; protected photos
   are left alone.
-* **Format the disc**, behind three separate confirmations.
+* **Format the disc**, behind three separate confirmations, with what will happen spelled out
+  before and the next steps after (switch the camera off and on, Diary vs Free mode).
 * Shows the disc's **album mode** (Diary: standard quality only; Free: FINE allowed) and how to
   switch it on the camera, and how to set the camera's clock (the cable can't).
 * **Delete photos from the library** (to the Trash).
@@ -83,6 +87,11 @@ over its serial port and provides:
   between shots, which helps when the camera's clock battery has died.
 * Rotate photos, mark **favourites** and add **captions**.
 * Shift-click, ⌘/Ctrl-click and ⌘/Ctrl-A select several photos for batch edits.
+
+**Help built in**
+* How-to topics (connecting, FINE photos and Free mode, the clock, formatting, sending pictures,
+  troubleshooting), the English cheat sheets to zoom into, and a search across them and every
+  translated camera menu, button and on-screen message (English or Japanese).
 
 **Editing** (your original files are never changed)
 * One-click **auto-enhance**, tuned for the camera's colour casts.

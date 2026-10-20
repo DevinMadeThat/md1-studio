@@ -581,3 +581,39 @@ textarea.caption:focus { border-color: var(--accent); background: rgba(255, 255,
 .btn.danger { background: var(--danger); color: #fff; border-color: transparent; font-weight: 550; }
 .danger-link { color: var(--danger) !important; }
 .mode-tip { margin: 0 0 14px; }
+
+/* ------------------------------------------------ light switches, connect options */
+.switch.light { justify-content: center; font-size: 12px; color: var(--muted); cursor: pointer; }
+.switch.light i { background: var(--line); }
+.connect-opts { margin-top: 16px; }
+.connect-opts .switch.light { justify-content: flex-start; }
+
+/* ------------------------------------------------ help */
+.search.wide .field { width: 300px; }
+.search.wide .field:focus { width: 340px; }
+.help-page { max-width: 1100px; }
+.help-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(230px, 1fr)); gap: 10px; margin-bottom: 26px; }
+.help-card {
+  display: flex; flex-direction: column; gap: 4px; text-align: left; padding: 12px 14px; border-radius: 10px;
+  border: 1px solid var(--line); background: var(--panel); box-shadow: var(--shadow); cursor: pointer;
+}
+.help-card:hover { border-color: var(--accent); }
+.help-sheets { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+.help-sheet { display: flex; flex-direction: column; gap: 6px; border: 0; background: none; padding: 0; text-align: left; cursor: zoom-in; font-size: 12px; }
+.help-sheet img { width: 100%; height: 190px; object-fit: cover; object-position: top; border-radius: 8px; box-shadow: 0 0 0 1px var(--line), var(--shadow); background: #fff; }
+.help-sheet:hover img { box-shadow: 0 0 0 2px var(--accent); }
+.help-hits { display: grid; gap: 6px; margin-bottom: 26px; }
+.help-hit { padding: 8px 12px; border-radius: 8px; background: var(--panel); border: 1px solid var(--line); display: grid; gap: 3px; }
+.help-hit .pill { font-size: 10px; }
+.help-article { max-width: 680px; line-height: 1.55; }
+.help-article h1 { font-size: 22px; margin: 10px 0 14px; }
+.help-article li { margin-bottom: 6px; }
+.help-article code { font-size: 12px; background: var(--hover); padding: 1px 4px; border-radius: 4px; }
+.menu-path { font-weight: 600; background: var(--hover); padding: 1px 6px; border-radius: 5px; white-space: normal; }
+table.keys td { padding: 4px 16px 4px 0; }
+table.keys td:first-child { font-weight: 600; white-space: nowrap; }
+.sheet-view { position: fixed; inset: 0; z-index: 25; background: #0e0e10; color: #eee; display: flex; flex-direction: column; }
+.sheet-view .v-btn { font-size: 18px; }
+.sv-scroll { flex: 1; overflow: auto; text-align: center; padding: 10px 20px 40px; }
+.sv-scroll img { display: inline-block; max-width: none; border-radius: 6px; background: #fff; }
+.cam-tile img.rot90, .cam-tile img.rot180, .cam-tile img.rot270 { object-position: center; }

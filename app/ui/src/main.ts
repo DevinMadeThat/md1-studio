@@ -8,6 +8,7 @@ import {
   type AddSource, type BrowseEvent, type CameraContents, type CameraInfo, type CameraPhoto, type Disc, type ImportEvent, type Item, type LibAlbum, type Photo, type PortInfo, type Settings, type WriteEvent,
 } from "./api";
 import { openContactSheet } from "./contactSheet";
+import { openSheet, renderHelp } from "./help";
 import { startSlideshow } from "./slideshow";
 import { effectiveTaken, googleMapsUrl, openDateEditor, openExportSheet, openLocationEditor, saveEdits } from "./editors";
 import { formatLatLon } from "./geo";
@@ -26,7 +27,8 @@ type View =
   | { kind: "favorites" }
   | { kind: "import"; at: string }
   | { kind: "album"; id: string }
-  | { kind: "disc"; path: string };
+  | { kind: "disc"; path: string }
+  | { kind: "help"; topic: string | null };
 type Filter = "all" | "favorites" | "sound" | "fine";
 
 interface ImportState {
@@ -70,6 +72,9 @@ const state = {
   writeOk: false,
   /** Seconds into a format of the camera's disc. */
   formatting: null as number | null,
+  /** Read the camera's thumbnails as soon as it connects. */
+  autoBrowse: prefs.get("autoBrowse", true),
+  helpQuery: "",
   /** The disc in the camera, seen through its thumbnails. */
   cam: {
     contents: null as CameraContents | null,
@@ -234,6 +239,8 @@ function renderSidebar() {
     ${ss.length ? `<div class="nav-section">Imports</div>${imports}${ss.length > 6 ? `<button class="nav-add" data-action="toggle-imports">${state.showAllImports ? "Show fewer" : `Show all ${ss.length}`}</button>` : ""}` : ""}
     <div class="nav-section">Albums <button class="nav-section-btn" data-action="new-album" title="New album">${icon.plus(13)}</button></div>
     ${albums || `<div class="nav-empty">Select photos, then “Add to album”.</div>`}
+    <div class="nav-section">Help</div>
+    ${nav(v.kind === "help", `data-nav="help"`, icon.help(), "Help", "Setup, camera menus, cheat sheets")}
     <button class="nav-section nav-toggle" data-action="toggle-discs">${state.discsOpen ? "▾" : "▸"} MiniDiscs <span class="muted">${state.discs.length}</span></button>
     ${state.discsOpen ? `${discs}<button class="nav-add" data-action="add-folder">${icon.plus(14)} Add backup folder…</button>` : ""}
     <div class="sidebar-foot">
@@ -278,6 +285,7 @@ function renderConnect() {
           <button class="btn primary" data-action="connect" ${state.connecting || !state.port ? "disabled" : ""}>${state.connecting ? `<span class="spinner"></span> Connecting…` : "Connect"}</button>
         </div>
         <button class="linkish" data-action="toggle-manual">${state.manualPort ? "Choose from the list" : "Enter a port path by hand"}</button>
+        <div class="connect-opts">${autoBrowseToggle()}</div>
         ${state.connectError ? `<div class="callout error">${esc(state.connectError)}</div>` : ""}
         ${state.connectLog.length ? `<pre class="log">${esc(state.connectLog.join("\n"))}</pre>` : ""}
       </section>
@@ -329,7 +337,7 @@ function drawCamera() {
     body = `<div class="browse-wait">
       <div><b>Formatting the disc…</b></div>
       <div class="progress"><i style="width:${pct.toFixed(1)}%"></i></div>
-      <div class="muted small">${state.formatting} s · the camera takes about 50 seconds and doesn't answer meanwhile. Don't switch it off.</div>
+      <div class="muted small">${state.formatting} s · the camera takes about 50 seconds and doesn't answer meanwhile. Don't switch it off. When it's done, the app disconnects and tells you what to do next.</div>
     </div>`;
   } else if (cs.browsing) {
     const pct = cs.total ? Math.min(100, (cs.done / cs.total) * 100) : 0;
@@ -337,11 +345,17 @@ function drawCamera() {
       <div class="muted">Reading the camera's thumbnails…</div>
       <div class="progress" id="browse-progress"><i style="width:${pct.toFixed(1)}%"></i></div>
       <div class="muted small" id="browse-meta">${cs.total ? `${fmtBytes(cs.done)} of ${fmtBytes(cs.total)}` : "Listing the disc"}</div>
+      <div><button class="btn small" data-action="cancel-import">Stop</button></div>
+      ${autoBrowseToggle()}
     </div>`;
   } else if (cs.error) {
     body = `<div class="callout error">${esc(cs.error)}</div><button class="btn" data-action="browse">Try again</button>`;
   } else if (!cs.contents) {
-    body = `<button class="btn primary" data-action="browse">${icon.photos(15)} Show photos on the camera</button>`;
+    body = `<div class="browse-wait">
+      <button class="btn primary" data-action="browse">${icon.photos(15)} Show photos on the camera</button>
+      <div class="muted small">Reads the camera's thumbnails: a few seconds per photo the first time, instant for a disc it has seen before.</div>
+      ${autoBrowseToggle()}
+    </div>`;
   } else if (!rows.length) {
     body = `<div class="empty">There are no photos on this disc.</div>`;
   } else {
@@ -393,7 +407,7 @@ function drawCamera() {
   }
 
   const tip = cs.contents?.albumMode === "diary"
-    ? `<div class="callout small mode-tip">This disc is in <b>Diary mode</b>, so the camera takes standard-quality photos only. For <b>FINE</b> photos, switch it on the camera: MENU → 準備 (Setup) → アルバムモード (Album mode) → フリーモード (Free mode) → 実行. It can't be switched back.</div>`
+    ? `<div class="callout small mode-tip">This disc is in <b>Diary mode</b>, so the camera takes standard-quality photos only. For <b>FINE</b> photos, switch it on the camera: MENU → 準備 (Setup) → アルバムモード (Album mode) → フリーモード (Free mode) → 実行. It can't be switched back. <button class="linkish" data-action="help-fine">More…</button></div>`
     : "";
   const head = cs.contents && rows.length
     ? `<h3 class="album-head">On the camera <span class="muted">${plural(rows.length, "photo")}${rows.length - fresh.length ? ` · ${rows.length - fresh.length} already in your library` : ""}</span>
@@ -410,6 +424,10 @@ function drawCamera() {
     ${strip}
     <div class="page cam-page">${state.formatting == null ? tip + head : ""}${body}</div>
     ${bar}`;
+}
+
+function autoBrowseToggle() {
+  return `<label class="switch light"><input type="checkbox" data-pref="autoBrowse" ${state.autoBrowse ? "checked" : ""}><i></i> Show the camera's photos automatically when it connects</label>`;
 }
 
 function camStrip(cam: CameraInfo) {
@@ -992,7 +1010,7 @@ async function connect() {
     state.connecting = false;
     render();
   }
-  if (state.camera) browse(false);
+  if (state.camera && state.autoBrowse) browse(false);
 }
 
 async function browse(refresh: boolean) {
@@ -1004,7 +1022,7 @@ async function browse(refresh: boolean) {
     const ids = new Set(cs.contents.photos.map((p) => p.id));
     [...cs.selection].forEach((id) => { if (!ids.has(id)) cs.selection.delete(id); });
   } catch (e) {
-    cs.error = `Couldn't read the photo list: ${e}`;
+    cs.error = String(e) === "Cancelled." ? null : `Couldn't read the photo list: ${e}`;
   } finally {
     cs.browsing = false;
     render();
@@ -1301,7 +1319,11 @@ async function formatDisc() {
   if (!second) return;
   const third = await confirmBox(
     "Last chance",
-    `<p class="small">Erase the disc now? Keep the camera switched on until it's done (about 50 seconds).${cam.status.power < 5 ? " It's on battery: the AC adapter is safer." : ""}</p>`,
+    `<p class="small">Erase the disc now? Here's what happens:</p>
+     <ol class="small steps"><li>The camera works silently for <b>about 50 seconds</b>. Keep it switched on.</li>
+       <li>The app disconnects. The camera <b>keeps showing “PC”</b>; that's expected.</li>
+       <li>You switch the camera off and on, and it has an empty disc.</li></ol>
+     ${cam.status.power < 5 ? `<p class="small muted">It's on battery: the AC adapter is safer.</p>` : ""}`,
     "Erase the disc",
     { danger: true, countdown: 5, cancel: "Don't format" },
   );
@@ -1311,27 +1333,29 @@ async function formatDisc() {
   renderCamera();
   try {
     await api.cameraFormat();
-    toast("The disc is formatted. Switch the camera off and on, then connect again.");
     await api.disconnect().catch(() => {});
     resetCamera();
+    state.formatting = null;
+    render();
+    const m = openModal(
+      "The disc is formatted",
+      `<p class="small">The app has disconnected. What to do next:</p>
+       <ol class="small steps">
+         <li><b>Switch the camera off and on.</b> It still shows “PC” until you do.</li>
+         <li>The disc is now empty and in <b>Diary mode</b> (standard quality only). For FINE photos, switch it to Free mode on the camera: MENU → 準備 → アルバムモード → フリーモード → 実行.</li>
+         <li>Take one photo with the camera. That creates the album the app adds pictures to.</li>
+         <li>To use the app again, set the function switch to playback and press <b>Connect</b>.</li>
+       </ol>
+       <div class="modal-actions"><button class="linkish" id="fm-help">More in Help</button><span class="spacer"></span><button class="btn primary" id="fm-ok">OK</button></div>`,
+    );
+    m.el.querySelector("#fm-ok")!.addEventListener("click", m.close);
+    m.el.querySelector("#fm-help")!.addEventListener("click", () => { m.close(); state.view = { kind: "help", topic: "format" }; render(); });
   } catch (e) {
     toast(`Formatting failed: ${e}`, undefined, "error");
   } finally {
     state.formatting = null;
     render();
   }
-}
-
-function clockHelp() {
-  const m = openModal(
-    "Setting the camera's clock",
-    `<p class="small">The clock can only be set on the camera itself: no command over the cable sets it (we tried several; see the project's lab notebook).</p>
-     <ol class="small steps"><li>MENU → 準備 (Setup) → <b>日時設定</b> (Date/time set).</li>
-       <li>Turn the jog dial to change each field, press it to go to the next. The clock starts after the minutes.</li></ol>
-     <p class="small muted">The camera's small backup battery is probably flat, so it forgets the time whenever the main battery comes out. For photos taken with the clock unset, set their dates in the library (Date &amp; time… → “Keep the time between shots”).</p>
-     <div class="modal-actions"><span class="spacer"></span><button class="btn primary" id="ch-ok">OK</button></div>`,
-  );
-  m.el.querySelector("#ch-ok")!.addEventListener("click", m.close);
 }
 
 // ---------------------------------------------------------------- clipboard
@@ -1370,8 +1394,21 @@ function keepScroll(page: string, draw: () => void) {
   if (el && top) el.scrollTop = top;
 }
 
+function renderHelpView() {
+  const v = state.view as { kind: "help"; topic: string | null };
+  keepScroll(`help:${v.topic}`, () => {
+    $("#main").innerHTML = `
+      <header class="toolbar" data-drag>
+        <div class="tb-title">Help <span class="tb-sub">how-to, the camera's menus in English, cheat sheets</span></div>
+        <div class="search wide">${icon.search(13)}<input id="help-search" class="field" placeholder="Search: “fine”, “clock”, “フォーマット”…" value="${esc(state.helpQuery)}" spellcheck="false"></div>
+      </header>
+      <div class="page help-page">${renderHelp(v.topic ? "" : state.helpQuery, v.topic)}</div>`;
+  });
+}
+
 function render() {
   renderSidebar();
+  if (state.view.kind === "help") return renderHelpView();
   if (state.view.kind === "camera") return renderCamera();
   if (state.view.kind === "disc" && !currentDisc()) state.view = { kind: "library" };
   renderGrid();
@@ -1403,6 +1440,12 @@ document.addEventListener("dblclick", (e) => {
 
 document.addEventListener("click", async (e) => {
   const t = e.target as HTMLElement;
+  const help = t.closest<HTMLElement>("[data-help-topic],[data-help-back],[data-help-sheet]");
+  if (help) {
+    if (help.dataset.helpSheet) openSheet(help.dataset.helpSheet);
+    else { state.view = { kind: "help", topic: help.dataset.helpTopic ?? null }; render(); }
+    return;
+  }
   const el = t.closest<HTMLElement>("[data-action],[data-nav],[data-disc],[data-import],[data-album],[data-filter],[data-select],[data-photo],[data-cam],[data-v]");
   if (!el) return;
   const me = e as MouseEvent;
@@ -1453,6 +1496,7 @@ document.addEventListener("click", async (e) => {
     state.renaming = false;
     render();
   };
+  if (el.dataset.nav === "help") return goTo({ kind: "help", topic: null });
   if (el.dataset.nav) return goTo({ kind: el.dataset.nav as "camera" | "library" | "favorites" });
   if (el.dataset.disc) return goTo({ kind: "disc", path: el.dataset.disc });
   if (el.dataset.import !== undefined) return goTo({ kind: "import", at: el.dataset.import });
@@ -1606,7 +1650,9 @@ document.addEventListener("click", async (e) => {
     case "sel-delete": deleteFromLibrary(selectedItems()); break;
     case "cam-delete": deleteOnCamera(); break;
     case "format-disc": formatDisc(); break;
-    case "clock-help": clockHelp(); break;
+    case "clock-help": state.view = { kind: "help", topic: "clock" }; render(); break;
+    case "help-fine": state.view = { kind: "help", topic: "fine" }; render(); break;
+    case "help-format": state.view = { kind: "help", topic: "format" }; render(); break;
     case "cam-rotate-left": markOnCamera({ rotateBy: -1 }); break;
     case "cam-rotate-right": markOnCamera({ rotateBy: 1 }); break;
     case "cam-protect": {
@@ -1636,10 +1682,20 @@ document.addEventListener("change", (e) => {
     if (viewer.audio) viewer.audio.loop = t.checked;
   }
   if (t.id === "port-select") state.port = t.value;
+  if (t.dataset.pref === "autoBrowse") { state.autoBrowse = t.checked; prefs.set("autoBrowse", t.checked); }
 });
 
 document.addEventListener("input", (e) => {
   const t = e.target as HTMLInputElement;
+  if (t.id === "help-search") {
+    state.helpQuery = t.value;
+    const pos = t.selectionStart;
+    renderHelpView();
+    const again = document.getElementById("help-search") as HTMLInputElement | null;
+    again?.focus();
+    if (again && pos != null) again.setSelectionRange(pos, pos);
+    return;
+  }
   if (t.id === "search") {
     state.query = t.value;
     const pos = t.selectionStart;

@@ -1,12 +1,13 @@
 # Next steps and open questions
 
-Where to pick up next session (camera battery was low at the end of 2026-10-18).
+Where to pick up next (updated 2026-10-19 evening).
 
 ## Before starting
 
 * Charge the battery (or use the AC adapter). Writing is refused below power state 3 (status byte 8).
-* The camera may still be at 115200 baud; `md1.py --id f1 probe` finds it.
-* The disc in the camera is disc 2 = restored mirror + `PSN00019.PMP` (20 photos).
+* The camera may still be at 115200 baud; the app and `md1 probe` try 9600 and 115200.
+* Disc 2 was formatted from the app on 2026-10-19 (everything on it was backed up first:
+  `downloads/disc2/` plus the library) and now holds one new photo (lab-notebook §17).
 
 ## Data collection
 
@@ -42,21 +43,20 @@ Where to pick up next session (camera battery was low at the end of 2026-10-18).
 
 ## Desktop app (MD1 Studio, `app/`) — next
 
-v0.1 (built 2026-10-18) connects, imports, browses, plays sound and exports. First real-camera
-connection: 2026-10-19 (worked). Since then: browse the camera through its thumbnails, download
-chosen photos, one library grouped by import day, matching of camera photos to the library.
+Done so far (see app/README.md): connect; thumbnail browser with "In library" matching;
+download chosen photos or the whole disc; library with Imports, Albums, search; viewer, editor,
+slideshow with sound, contact sheets, clipboard, export (JPEG/PNG/TIFF); writing to the camera
+(add pictures, rotate, protect, delete, format) tested on the hardware; built-in help.
 
-1. **Real-camera run of the thumbnail browser**: browse disc 2 (restored, 20 photos; should show
-   19 as in the library through name/size/thumbnail matching even though the restore gave the
-   files new times), download `PSN00019`, then do disc 1.
-2. **Restore disc from backup** (port `md1tool/restore.py`): confirmation screen, battery check
-   (status power ≥ 3), write-protect hint, verify every file, "power-cycle the camera" prompt.
-3. **Add photos to the camera** (port `add_photo.py`): camera-made PMPs first; arbitrary JPEGs
-   need a synthesized PMP header (see above).
-4. Windows and Linux builds via `.github/workflows/build.yml` (push a `v*` tag).
-5. Signing/notarization for macOS distribution; LGPL note for the ATRAC1 crate.
-6. Nice to have: set a real date for clock-less discs at export ("these were taken on …"),
-   slideshow with sound, album covers from `OV_IDX.PMX`, show `PDF_MD` contents.
+1. **Restore a disc from a backup** in the app (port `md1tool/restore.py`): confirmation,
+   battery check, verify every file, "switch the camera off and on" prompt.
+2. **Camera-side albums**: create `PIC0000n` folders with titles (OV_INF) from the app.
+3. **Sound for uploaded pictures**: needs an ATRAC1 encoder (e.g. `atracdenc`).
+4. Release: push a `v*` tag (CI builds macOS, Windows, Linux); signing/notarization for macOS.
+5. Firmware: no way to read it over the cable is known. If the camera is opened (e.g. to replace
+   the clock's backup cell), photograph every chip; dump the small settings EEPROM first.
+6. Nice to have: a real date for clock-less discs at export, album covers from `OV_IDX.PMX`,
+   `PDF_MD` contents.
 
 ### What Sony's Album Utility 1.5 did (from its help file) vs. MD1 Studio
 

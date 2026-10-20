@@ -208,5 +208,13 @@ Disc 2 (restored + `PSN00019`, 20 photos) in the camera, on battery (power 4). T
   `PIC_INF.PMF`/`PIDX000.PMX`, counts updated in both index files, then `PSN00020.PMP` deleted
   (`NRA00020.PMA` didn't exist and was skipped). Browse afterwards: 20 photos, 20 thumbnails.
   Rehearsed first on the fake camera, including a photo with sound.
-* **Format from the app**: rehearsed on the fake camera only (`md1 format` with the confirmation
-  phrase; the fake goes silent, then serves an empty disc). Not run on a real disc.
+* **Format from the app**: rehearsed on the fake camera (`md1 format` with the confirmation
+  phrase; the fake goes silent, then serves an empty disc).
+
+## 17. Owner formats disc 2 from the app (2026-10-19 evening)
+
+The owner used **Format disc…** in MD1 Studio on disc 2 (everything on it already backed up).
+It worked: the camera went quiet, the app reported success and disconnected. **The camera kept
+showing “PC”** afterwards; switching it off and on cleared that. After reconnecting, the camera
+took a photo normally. The app now says beforehand what will happen and shows these next
+steps after a format (switch off and on, Diary mode, take a photo before sending pictures).
