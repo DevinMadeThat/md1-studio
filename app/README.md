@@ -62,7 +62,7 @@ mirrors `md1tool/md1.py`, which was proven on a real camera.
   Imports) and the user's albums (`<library>/albums.json`: ordered item keys and a cover). The
   per-disc folders sit in a collapsed "MiniDiscs" list; new ones are named after the day they
   were first imported (`MiniDisc 2026-10-19`).
-* **Help** (`ui/src/help.ts`): how-to topics, the cheat-sheet images and
+* **Help** (`ui/src/help.ts`): how-to topics, the labelled camera drawings, the cheat-sheet images and
   `cheatsheet/md1_cheatsheet_data.json`, bundled from `../cheatsheet/` at build time (Vite
   `import.meta.glob`, so the images aren't duplicated in the repo), searchable in English or
   Japanese; cheat sheets open full screen with zoom.

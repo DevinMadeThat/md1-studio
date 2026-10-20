@@ -6,12 +6,17 @@ import { esc } from "./ui";
 
 const sheetUrls = {
   ...import.meta.glob("../../../cheatsheet/MD1-cheatsheet-*.png", { eager: true, query: "?url", import: "default" }),
+  ...import.meta.glob("../../../cheatsheet/MD1-diagram-*.png", { eager: true, query: "?url", import: "default" }),
   ...import.meta.glob("../../../cheatsheet/MD1-menu-map-*.png", { eager: true, query: "?url", import: "default" }),
 } as Record<string, string>;
 
 export interface Sheet { file: string; title: string; url: string }
 
 const SHEET_TITLES: [RegExp, string][] = [
+  [/diagram-1/, "The camera: front and right side (the three jacks)"],
+  [/diagram-2/, "The camera: top, back, left side (I/O jack) and bottom"],
+  [/diagram-3/, "Wireless remote"],
+  [/diagram-4/, "Headphones with remote"],
   [/cheatsheet-1/, "Quick how-to: shooting, playback, sound, fine mode"],
   [/cheatsheet-2.*part(\d)of(\d)/, "Buttons, switches and jacks ($1 of $2)"],
   [/cheatsheet-3/, "Camera (shooting) menu"],
@@ -31,7 +36,8 @@ export const sheets: Sheet[] = Object.entries(sheetUrls)
     const title = hit && m ? hit[1].replace(/\$(\d)/g, (_, k) => m[+k] ?? "") : file;
     return { file, title, url };
   })
-  .sort((a, b) => a.file.localeCompare(b.file));
+  // The labelled drawings of the camera first, then the cheat sheets and menu maps.
+  .sort((a, b) => +!a.file.includes("diagram") - +!b.file.includes("diagram") || a.file.localeCompare(b.file));
 
 export interface Topic { id: string; title: string; summary: string; keywords: string; body: string }
 
@@ -42,13 +48,13 @@ export const topics: Topic[] = [
     id: "connect",
     title: "Connect the camera",
     summary: "Cable, jack, playback mode, IrDA off.",
-    keywords: "cable serial usb rs232 port jack digital i/o irda connect ftdi com ttyusb dialout not found no answer",
+    keywords: "cable serial usb rs232 port jack digital i/o io dc in flap irda connect ftdi com ttyusb dialout not found no answer",
     body: `<ol>
       <li><b>Power</b>: the AC adapter or a charged battery (a session stalls if the camera switches itself off).</li>
-      <li><b>Function switch</b> to <b>再生/オーディオ</b> (playback).</li>
+      <li><b>Function switch</b> (back, right edge) <b>down</b> to <b>再生/オーディオ</b> (playback). Up is カメラ (shooting).</li>
       <li><b>Infrared off</b>: ${menu("MENU → 準備 (Setup) → IrDA → OFF")}. While IrDA is on, the cable jack is ignored.</li>
       <li>Optional: ${menu("準備 → パワーセーブ → OFF")} so the screen doesn't sleep.</li>
-      <li>Plug the 3.5 mm plug into <b>DIGITAL I/O</b> (デジタルI/O): jog-dial side, under the rubber flap, the lowest of the three openings. Not the headphone jack on the other side.</li>
+      <li>Plug the 3.5 mm plug into the <b>I/O</b> jack: on the camera's <b>left side</b> (screen facing you), open the rubber flap; it's the jack marked <b>I/O</b>, just below <b>DC IN</b>. It is <i>not</i> any of the three jacks on the right side (mic/line in, AV out, headphones).</li>
       <li>In the app: <b>Camera</b> → pick the port (the USB adapter is listed first, marked ★) → <b>Connect</b>.</li>
     </ol>
     <p>While connected the camera shows “PC” and ignores its own buttons.</p>
@@ -169,7 +175,7 @@ export const topics: Topic[] = [
     summary: "No answer, frozen “PC” screen, slow transfers.",
     keywords: "trouble problem error no answer not found frozen stuck pc screen slow timeout battery reset hang",
     body: `<ul>
-      <li><b>No answer</b>: IrDA is on, the plug is in the wrong jack, the camera is asleep or not in playback, or it's still at a speed set earlier (the app tries 9,600 and 115,200).</li>
+      <li><b>No answer</b>: IrDA is on, the plug is in the wrong jack (it goes in <b>I/O</b>, left side under the flap, below DC IN), the camera is asleep or not in playback, or it's still at a speed set earlier (the app tries 9,600 and 115,200).</li>
       <li><b>Stuck on “PC”</b> after the app disconnects: switch the camera off and on.</li>
       <li><b>Frozen, power switch does nothing</b>: remove the battery for a few seconds.</li>
       <li><b>“The camera stopped answering”</b>: it probably switched itself off; switch it on and connect again.</li>
@@ -226,7 +232,7 @@ export function renderHelp(q: string, topicId: string | null): string {
     </div>`;
   }
   const card = (t: Topic) => `<button class="help-card" data-help-topic="${t.id}"><b>${esc(t.title)}</b><span class="muted small">${esc(t.summary)}</span></button>`;
-  const sheet = (s: Sheet) => `<button class="help-sheet" data-help-sheet="${esc(s.file)}"><img src="${s.url}" alt="" loading="lazy"><span>${esc(s.title)}</span></button>`;
+  const sheet = (s: Sheet) => `<button class="help-sheet${s.file.includes("diagram") ? " drawing" : ""}" data-help-sheet="${esc(s.file)}"><img src="${s.url}" alt="" loading="lazy"><span>${esc(s.title)}</span></button>`;
   if (!q.trim()) {
     return `<h3 class="album-head">How to</h3><div class="help-cards">${topics.map(card).join("")}</div>
       <h3 class="album-head">English cheat sheets <span class="muted">every button, menu and message on the camera</span></h3>

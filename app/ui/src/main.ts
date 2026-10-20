@@ -273,8 +273,8 @@ function renderConnect() {
         <h1>Connect your DSC-MD1</h1>
         <p class="lede">See the photos on the disc, then copy the ones you want, with their recorded sound. Nothing on the disc is changed.</p>
         <ol class="steps">
-          <li><b>Cable</b> — USB-serial adapter + DB9 ↔ 3.5 mm cable into the camera's <b>DIGITAL I/O</b> jack (the lowest of the three).</li>
-          <li><b>Playback mode</b> — function switch to <b>再生</b> (PLAY).</li>
+          <li><b>Cable</b> — USB-serial adapter + DB9 ↔ 3.5 mm cable into the camera's <b>I/O</b> jack: left side, under the rubber flap, just below DC IN (not the three jacks on the right side).</li>
+          <li><b>Playback mode</b> — function switch down, to <b>再生/オーディオ</b> (playback).</li>
           <li><b>IrDA off</b> — MENU → 準備 (SETUP) → IrDA → <b>OFF</b>. With IrDA on, the jack is silent.</li>
         </ol>
         <div class="connect-row">
@@ -1344,7 +1344,7 @@ async function formatDisc() {
          <li><b>Switch the camera off and on.</b> It still shows “PC” until you do.</li>
          <li>The disc is now empty and in <b>Diary mode</b> (standard quality only). For FINE photos, switch it to Free mode on the camera: MENU → 準備 → アルバムモード → フリーモード → 実行.</li>
          <li>Take one photo with the camera. That creates the album the app adds pictures to.</li>
-         <li>To use the app again, set the function switch to playback and press <b>Connect</b>.</li>
+         <li>To use the app again, set the function switch down to playback and press <b>Connect</b>.</li>
        </ol>
        <div class="modal-actions"><button class="linkish" id="fm-help">More in Help</button><span class="spacer"></span><button class="btn primary" id="fm-ok">OK</button></div>`,
     );

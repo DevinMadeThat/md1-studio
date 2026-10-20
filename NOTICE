@@ -13,7 +13,9 @@ Rust and npm dependencies are listed in app/Cargo.lock and app/package-lock.json
 own licences (MIT / Apache-2.0 for Tauri and the crates used).
 
 Sony, Cyber-shot and MiniDisc are trademarks of Sony Group Corporation. This project is not
-affiliated with or endorsed by Sony. No Sony software or documentation is included.
+affiliated with or endorsed by Sony. No Sony software is included. The line art in
+cheatsheet/MD1-diagram-*.png (also shown in the app's Help) is from the parts pages of Sony's
+DSC-MD1 instruction manual (1997), © Sony, relabelled in English.
 
 docs/images/dsc-md1.jpg is "Sony CyberShot DSC-MD1 CP+ 2011" by Morio (Wikimedia Commons),
 CC BY-SA 3.0, resized. The sample photos in docs/images/screenshot-*.jpg are public domain or

@@ -21,12 +21,10 @@ photo-metadata.csv
 
 # ---- Third-party material we may not redistribute -------------------------------
 # Sony's "Digital Still Camera Utility 1.5" CD image and the camera's instruction manual
-# (see docs/references.md for where to find them), saved web pages, and the cheat-sheet
-# diagrams that are drawn on top of the manual's illustrations.
+# (see docs/references.md for where to find them) and saved web pages.
 *.iso
 *.pdf
 /Info/
-/cheatsheet/MD1-diagram-*.png
 
 # ---- Build output / environments -----------------------------------------------
 node_modules/

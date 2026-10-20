@@ -19,7 +19,7 @@
    "ja": "電源スイッチ",
    "en": "Power switch",
    "where": "right side, top",
-   "note": "Push right to turn on/off (p.21). Body label: 電源 / 充電"
+   "note": "Slide to turn on/off (p.21). Body label: 電源 / 充電"
   },
   {
    "ja": "プログラムAEダイヤル",
@@ -31,7 +31,7 @@
    "ja": "マイク入力/ライン入力切換スイッチ",
    "en": "Mic in / Line in selector",
    "where": "right side",
-   "note": "Pick input for audio recording (p.77)"
+   "note": "Up = マイク入力 (mic) · Down = ライン入力 (line in, e.g. a CD player) (p.77)"
   },
   {
    "ja": "外部マイク音声/ライン入力端子",
@@ -49,7 +49,7 @@
    "ja": "バッテリー解除/ロックスイッチ",
    "en": "Battery release/lock switch",
    "where": "right side, lower",
-   "note": "Set to ロック after inserting battery (p.16)"
+   "note": "Up = 解除 (release) · Down = ロック (lock; keep it here once the battery is in) (p.16)"
   },
   {
    "ja": "[ヘッドホン記号]/リモコン端子",
@@ -175,13 +175,13 @@
    "ja": "ズームスイッチ",
    "en": "Zoom switch",
    "where": "back, right edge",
-   "note": "T = telephoto, W = wide (p.24)"
+   "note": "Up = T (zoom in) · Down = W (wide) (p.24)"
   },
   {
    "ja": "ファンクションスイッチ",
    "en": "Function switch",
    "where": "back, right edge",
-   "note": "カメラ / 再生/オーディオ (p.95)"
+   "note": "Up = カメラ (shoot) · Down = 再生/オーディオ (view photos, play music, connect to a PC) (p.95)"
   },
   {
    "ja": "バッテリー端子",
@@ -265,14 +265,14 @@
   {
    "ja": "DC IN端子",
    "en": "DC IN jack",
-   "where": "left side, lower",
+   "where": "left side, under the flap",
    "note": "AC adaptor / charging (p.17)"
   },
   {
    "ja": "デジタルI/O端子",
    "en": "Digital I/O jack",
-   "where": "left side, bottom",
-   "note": "Serial cable to PC (IrDA must be OFF) (p.76)"
+   "where": "left side, under the flap, just below DC IN; marked I/O",
+   "note": "Serial cable to the PC (IrDA must be OFF). Not one of the three jacks on the right side (p.76)"
   },
   {
    "ja": "開くスイッチ",
@@ -412,13 +412,13 @@
    "ja": "カメラ",
    "en": "Camera",
    "where": "function switch position",
-   "note": "Shooting; menu = 撮影メニュー (p.95)"
+   "note": "Up position: shooting; menu = 撮影メニュー (p.95)"
   },
   {
    "ja": "再生/オーディオ",
    "en": "Playback/Audio",
    "where": "function switch position",
-   "note": "Play MD DATA images (再生メニュー) or music MD (オーディオメニュー)"
+   "note": "Down position: play MD DATA images (再生メニュー) or a music MD (オーディオメニュー); use this to connect to a PC"
   },
   {
    "ja": "•（標準モード）",
@@ -520,7 +520,7 @@
    "ja": "T（望遠）/ W（広角）",
    "en": "T (tele) / W (wide)",
    "where": "zoom switch",
-   "note": ""
+   "note": "Up = T (zoom in) · Down = W (wide)"
   },
   {
    "ja": "簡易表示 → 詳細表示 → 表示なし",
@@ -538,25 +538,25 @@
    "ja": "マイク入力",
    "en": "Mic input",
    "where": "mic/line switch position",
-   "note": "Built-in or external mic; mono = 2x record time (p.93)"
+   "note": "Up position: built-in or external mic; mono = 2x record time (p.93)"
   },
   {
    "ja": "ライン入力",
    "en": "Line input",
    "where": "mic/line switch position",
-   "note": "CD player etc. for music MD / BGM recording (pp.60, 89)"
+   "note": "Down position: CD player etc. for music MD / BGM recording (pp.60, 89)"
   },
   {
    "ja": "解除",
    "en": "Release",
    "where": "battery release/lock switch position",
-   "note": "To remove/insert battery"
+   "note": "Up position: to remove or insert the battery"
   },
   {
    "ja": "ロック",
    "en": "Lock",
    "where": "battery release/lock switch position",
-   "note": "Yellow mark shows; always use when battery fitted"
+   "note": "Down position: yellow mark shows; always use once the battery is in"
   },
   {
    "ja": "ホールド",

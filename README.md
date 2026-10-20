@@ -15,7 +15,7 @@ over its serial port and provides:
   the pictures, and exports ordinary JPEGs and WAVs.
 * **Full documentation** of the serial protocol and the on-disc formats, including the
   hidden ATRAC sound files that Sony's own PC software never read.
-* **English cheat sheets** for the Japanese-only camera.
+* **English cheat sheets** for the Japanese-only camera, including labelled drawings of the body.
 
 <br clear="right">
 
@@ -90,7 +90,7 @@ over its serial port and provides:
 
 **Help built in**
 * How-to topics (connecting, FINE photos and Free mode, the clock, formatting, sending pictures,
-  troubleshooting), the English cheat sheets to zoom into, and a search across them and every
+  troubleshooting), labelled drawings of the camera and the English cheat sheets to zoom into, and a search across them and every
   translated camera menu, button and on-screen message (English or Japanese).
 
 **Editing** (your original files are never changed)
@@ -115,7 +115,7 @@ over its serial port and provides:
 |---|---|
 | A Sony **DSC-MD1** | Firmware 1.14 is the version tested. The related DSC-F1 uses a similar protocol but hasn't been tried with the app. |
 | A **USB-to-RS-232 adapter with an FTDI chip**, for example [OIKWAN USB to RS232 (FTDI)](https://www.amazon.com/dp/B0759HSLP1) | FTDI drivers come with macOS and Linux and install from Windows Update. Cheap Prolific/CH340 adapters may work but are untested. |
-| A **DB9 female to 3.5 mm stereo plug RS-232 cable**, for example [Qaoquda DB9 to 3.5 mm](https://www.amazon.com/dp/B06WLP4LTP) | Works as sold; no null-modem adapter needed. This plugs into the camera's DIGITAL I/O jack. |
+| A **DB9 female to 3.5 mm stereo plug RS-232 cable**, for example [Qaoquda DB9 to 3.5 mm](https://www.amazon.com/dp/B06WLP4LTP) | Works as sold; no null-modem adapter needed. This plugs into the camera's I/O jack. |
 | The camera's AC adapter or a full battery | A transfer stalls if the camera powers off partway through. |
 
 These aren't affiliate links, and any adapter and cable with the same wiring should work
@@ -124,10 +124,10 @@ These aren't affiliate links, and any adapter and cable with the same wiring sho
 ### Set up the camera
 
 1. Power it from the AC adapter or a full battery.
-2. Set the function switch to **再生/オーディオ** (playback/audio).
+2. Slide the function switch (back, right edge) **down** to **再生/オーディオ** (playback/audio). Up is カメラ (shooting).
 3. Turn infrared off: **MENU → 準備 (Setup) → IrDA → OFF**. While IrDA is on, the camera ignores the cable.
 4. Optional: **準備 → パワーセーブ → OFF**, so the screen doesn't go to sleep.
-5. Open the rubber flap on the jog-dial side and plug the cable into **DIGITAL I/O** (デジタルI/O), the lowest of the three openings. It is *not* the headphone jack on the other side.
+5. On the camera's **left side** (with the screen facing you), open the rubber flap and plug the cable into the jack marked **I/O**, just below **DC IN**. It is *not* any of the three jacks on the right side (mic/line in, AV out, headphones).
 
 While connected, the camera shows "PC" on its screen and ignores its own buttons. More detail
 and troubleshooting: [docs/hardware-and-setup.md](docs/hardware-and-setup.md). For the menus in

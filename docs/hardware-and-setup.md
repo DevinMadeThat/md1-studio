@@ -22,20 +22,25 @@ Parts: [OIKWAN USB to RS232 (FTDI)](https://www.amazon.com/dp/B0759HSLP1) and
 ## Camera preparation
 
 1. Power from the AC adapter or a full battery (a session stalls if the camera powers down).
-2. Function switch → **再生/オーディオ** (playback).
+2. Function switch (back, right edge) **down** → **再生/オーディオ** (playback). Up is カメラ.
 3. MENU → 準備 (Setup) → **IrDA → OFF**. With IrDA ON the cable jack is ignored.
 4. Optional: 準備 → パワーセーブ → OFF to stop the screen sleeping.
-5. Plug the cable into **デジタルI/O端子** — on the jog-dial side, below DC IN, under the rubber
-   flap (lowest of the three openings there). Not the headphone jack on the other side.
+5. Plug the cable into **デジタルI/O端子**, marked **I/O** on the body: on the left side (screen
+   facing you), under the rubber flap, just below DC IN. Not any of the three jacks on the right
+   side.
 6. For safety while experimenting, slide the disc's write-protect tab so the hole is open.
 
 While a session is active the camera shows "PC" and three Japanese characters (probably 通信中, "communicating"); the camera's buttons are ignored.
 
 ## Where the jacks are
 
-* Power-switch side: mic/line-in, AV OUT, headphone/remote jack (top to bottom). The headphone
-  jack carries playback audio for analog capture.
-* Jog-dial side: IrDA window, DC IN, DIGITAL I/O (top to bottom).
+Sides are as seen with the screen facing you.
+
+* Right side (power switch): mic/line-in, AV OUT, headphone/remote jack (top to bottom). The
+  headphone jack carries playback audio for analog capture. The mic/line switch beside them is
+  up for mic, down for line in.
+* Left side (jog dial): IrDA window, then under the rubber flap DC IN and the **I/O** jack below
+  it.
 
 See `cheatsheet/MD1-diagram-*.png` for labelled drawings.
 
