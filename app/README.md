@@ -7,21 +7,29 @@ alongside them. Built with Tauri 2 (Rust + web UI) for macOS, Windows and Linux.
 Everything it relies on is documented in [`../docs/`](../docs/README.md); the protocol code
 mirrors `md1tool/md1.py`, which was proven on a real camera.
 
-![The camera screen: connected over USB-serial at 115,200 baud, ready to import](../docs/images/screenshot-camera.jpg)
+![The camera screen: the disc's photos as thumbnails, four chosen to download](../docs/images/screenshot-camera.jpg)
 
 ## What it does (v0.1)
 
 * **Connect**: lists serial ports (USB-serial adapters first), finds the camera at 9600 or
   115200 baud, says hello, switches to 115200. Live status: mode, power, picture count, clock,
   disc label, free space. Polls every 15 s, which also notices when the camera powers off.
-* **Import a disc**: walks every folder, copies every file (photos `PSN*.PMP`, sound
-  `NRA*.PMA`, thumbnails, the album/disc index files, and `PDF_MD` if present), then converts
-  photos → JPEG and sound (ATRAC1) → WAV. Re-importing the same disc (recognized by its label +
-  format time) only copies new photos; files that changed on the camera are kept under
-  `history/`. Nothing is ever deleted.
-* **Library**: discs in the sidebar; photo grid with sound / FINE badges; filters (all / sound /
-  fine); a viewer with keyboard navigation, waveform sound player, and metadata (quality,
-  shutter speed, flash, shot time, file).
+* **Browse the camera** (`md1-core/src/browse.rs`): reads only the listing, the album indexes
+  and the camera's own 80 × 60 thumbnails (`PIDX*.PMX`, 4 KB a photo), so a disc's photo list
+  appears in seconds. Those files are cached per disc by size and directory-entry times, so
+  browsing again reads nothing that hasn't changed. Each photo is matched against the library
+  (same file size, plus the same creation time, thumbnail, or album and number; a disc restored
+  from a backup gets new file times but keeps the rest) and marked **In library**.
+* **Download chosen photos**: the picked `PSN*.PMP` files and their `NRA*.PMA` sound, plus
+  the small index and thumbnail files (reused from browsing, not read twice), then photos →
+  JPEG and sound (ATRAC1) → WAV. Each photo's import time is recorded in `disc.json`.
+* **Back up the whole disc**: every file (including `PDF_MD` if present), so it can be restored.
+  Either way, photos from one disc go into one folder (recognized by its label + format time);
+  files that changed on the camera are kept under `history/`. Nothing is ever deleted.
+* **Library**: **All photos** across every disc folder, grouped by import day (newest first),
+  plus each disc on its own (with a count of photos not downloaded yet); sound / FINE badges;
+  filters (all / ★ / sound / fine); a viewer with keyboard navigation, waveform sound player,
+  and metadata (quality, shutter speed, flash, shot time, import date, file).
 * **Viewer**: pinch / ⌘± / double-click to zoom, drag or two-finger scroll to pan; the zoom and
   position carry over as you step through photos. Optional auto-play and loop of the sound.
 * **Edit metadata** (one photo, or a selection: shift-click for ranges, ⌘-click to toggle, ⌘A):
@@ -120,7 +128,9 @@ certificate; tauri-action picks them up from repository secrets (see Tauri's doc
 ```sh
 python3 tools/fake_camera.py ../downloads/disc2/disc --stats-file /tmp/stats.json
 # FAKE CAMERA ON /dev/ttys012
-cargo run -p md1-core --bin md1 -- import /dev/ttys012 "/tmp/lib/Disc 2" "Disc 2"
+cargo run -p md1-core --bin md1 -- browse /dev/ttys012                  # photo list (JSON)
+cargo run -p md1-core --bin md1 -- get /dev/ttys012 "/tmp/lib/Disc 2" /PIC_MD/PIC00001/PSN00018.PMP
+cargo run -p md1-core --bin md1 -- import /dev/ttys012 "/tmp/lib/Disc 2" "Disc 2"   # whole disc
 ```
 
 In the app, choose "Enter a port path by hand" and type the `/dev/ttys…` path. The fake camera
@@ -139,11 +149,18 @@ URLs can be fetched; results are printed to stderr as `DIAG …`:
 MD1_DIAG=1 "target/release/bundle/macos/MD1 Studio.app/Contents/MacOS/md1-studio"
 ```
 
+With `MD1_DIAG_PORT=/dev/ttys…` (a fake camera) as well, it also connects, browses the camera
+through IPC, and checks that the thumbnails decode. Browsing only reads, so this is safe.
+
 ## Where things are stored
 
-* Library (default): `~/Pictures/MD1 Studio/<disc name>/` — same layout as `md1tool`
-  (`disc/`, `listing.txt`, `jpeg/`, `audio/`, `thumbnails/`, `disc-manifest.txt`) plus
-  `disc.json` (name, camera, format time, import history).
+* Library (default): `~/Pictures/MD1 Studio/Disc N/`, one folder per physical disc — same
+  layout as `md1tool` (`disc/`, `listing.txt`, `jpeg/`, `audio/`, `thumbnails/`,
+  `disc-manifest.txt`) plus `disc.json` (name, camera, format time, import history, per-photo
+  import times). After a selective download `disc/` holds only the photos you picked (and every
+  index file), so it isn't a complete backup until you use **Back up the whole disc**.
+* Camera index cache (thumbnails and album indexes from browsing): the OS cache folder,
+  `camera/<disc label + format time>/`.
 * Map tiles (OpenStreetMap, cached): the OS cache folder. Place searches go to
   nominatim.openstreetmap.org only when you press Find / paste; nothing else leaves the machine.
 * Settings: the OS app-config folder (`~/Library/Application Support/app.md1studio.desktop/`).

@@ -1,11 +1,27 @@
 // Editors for photo metadata: location and date/time, for one photo or many at once.
-import { api, type Disc, type Location, type Photo } from "./api";
+import { api, type Disc, type EditPatch, type Item, type Location, type Photo } from "./api";
 import { formatLatLon, parseCoordinates } from "./geo";
 import { icon } from "./icons";
 import { renderMap } from "./map";
 import { esc, openModal, prefs, toast } from "./ui";
 
 const label = (photos: Photo[]) => (photos.length === 1 ? `photo ${photos[0].number + 1}` : `${photos.length} photos`);
+
+/** Save edits for photos that may live in different disc folders (one call per folder);
+ * resolves with the updated discs. */
+export async function saveEdits(items: Item[], patch: (it: Item) => (EditPatch & { autoEnhance?: boolean }) | null): Promise<Disc[]> {
+  const byDisc = new Map<string, { disc: Disc; patches: ({ photoId: string } & EditPatch)[] }>();
+  for (const it of items) {
+    const p = patch(it);
+    if (!p) continue;
+    const g = byDisc.get(it.disc.path) ?? { disc: it.disc, patches: [] };
+    g.patches.push({ photoId: it.photo.id, ...p });
+    byDisc.set(it.disc.path, g);
+  }
+  const out: Disc[] = [];
+  for (const g of byDisc.values()) out.push(await api.editPhotos(g.disc.path, g.patches));
+  return out;
+}
 
 /** "Space Needle, 400, Broad Street, South Lake Union, …" → "Space Needle, 400, Broad Street" */
 const shortName = (name: string) => name.split(",").slice(0, 3).map((s) => s.trim()).join(", ");
@@ -14,7 +30,8 @@ export const googleMapsUrl = (l: Location) => `https://www.google.com/maps?q=${l
 
 // ------------------------------------------------------------------ location
 
-export function openLocationEditor(disc: Disc, photos: Photo[], onSaved: (d: Disc) => void) {
+export function openLocationEditor(items: Item[], onSaved: (discs: Disc[]) => void) {
+  const photos = items.map((it) => it.photo);
   const existing = photos.map((p) => p.edits.location).filter((l): l is Location => !!l);
   const same = existing.length === photos.length && existing.every((l) => l.lat === existing[0].lat && l.lon === existing[0].lon);
   let chosen: Location | null = same ? { ...existing[0] } : null;
@@ -128,9 +145,9 @@ export function openLocationEditor(disc: Disc, photos: Photo[], onSaved: (d: Dis
 
   const save = async (patch: { setLocation?: Location; clearLocation?: boolean }) => {
     try {
-      const d = await api.editPhotos(disc.path, photos.map((p) => ({ photoId: p.id, ...patch })));
+      const discs = await saveEdits(items, () => patch);
       m.close();
-      onSaved(d);
+      onSaved(discs);
     } catch (e) {
       toast(`Couldn't save: ${e}`, undefined, "error");
     }
@@ -161,7 +178,8 @@ const fromSecs = (n: number) => new Date(n * 1000).toISOString().slice(0, 19).re
 /** The date/time to show for a photo: the user's edit, else the camera's if its clock was set. */
 export const effectiveTaken = (p: Photo) => p.edits.taken ?? (p.clockUnset ? null : p.created);
 
-export function openDateEditor(disc: Disc, photos: Photo[], onSaved: (d: Disc) => void) {
+export function openDateEditor(items: Item[], onSaved: (discs: Disc[]) => void) {
+  const photos = items.map((it) => it.photo);
   const ordered = [...photos].sort((a, b) => (a.created ?? "").localeCompare(b.created ?? "") || a.number - b.number);
   const canKeep = photos.length > 1 && photos.every((p) => p.created);
   const first = ordered[0];
@@ -211,20 +229,20 @@ export function openDateEditor(disc: Disc, photos: Photo[], onSaved: (d: Disc) =
   m.el.querySelectorAll<HTMLInputElement>('input[name="dtmode"]').forEach((r) =>
     r.addEventListener("change", () => { mode = r.value as "keep" | "same"; preview(); }),
   );
-  const save = async (patches: ({ photoId: string; setTaken?: string; clearTaken?: boolean })[]) => {
+  const save = async (patchFor: Map<Photo, EditPatch>) => {
     try {
-      const d = await api.editPhotos(disc.path, patches);
+      const discs = await saveEdits(items, (it) => patchFor.get(it.photo) ?? null);
       m.close();
-      onSaved(d);
+      onSaved(discs);
     } catch (e) {
       toast(`Couldn't save: ${e}`, undefined, "error");
     }
   };
   $("#dt-apply").addEventListener("click", () => {
     const p = plan();
-    if (p) save(p.map((x) => ({ photoId: x.photo.id, setTaken: x.taken })));
+    if (p) save(new Map(p.map((x) => [x.photo, { setTaken: x.taken }])));
   });
-  m.el.querySelector("#dt-clear")?.addEventListener("click", () => save(photos.map((p) => ({ photoId: p.id, clearTaken: true }))));
+  m.el.querySelector("#dt-clear")?.addEventListener("click", () => save(new Map(photos.map((p) => [p, { clearTaken: true }]))));
   $("#dt-cancel").addEventListener("click", m.close);
   preview();
   input.focus();

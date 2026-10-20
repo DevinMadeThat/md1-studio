@@ -9,10 +9,11 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
+use md1_core::browse::{self, BrowseEvent, CameraDisc, CameraPhoto};
 use md1_core::camera::{self, Camera, Connection, Status, VolumeInfo};
 use md1_core::edits::{self, EditPatch};
 use md1_core::import::{self, DiscMeta, ImportEvent, ImportOptions};
-use md1_core::library::{self, Disc, Photo};
+use md1_core::library::{self, Disc, LibraryMatch, Photo};
 use md1_core::transport::{self, PortInfo};
 use md1_core::{export, Error};
 use serde::{Deserialize, Serialize};
@@ -24,6 +25,8 @@ struct Session {
     cam: Camera,
     conn: Connection,
     volume: Option<VolumeInfo>,
+    /// What browsing the disc read (listing, indexes, thumbnails); reused by downloads.
+    browsed: Option<CameraDisc>,
 }
 
 #[derive(Default, Clone, Serialize, Deserialize)]
@@ -226,7 +229,7 @@ async fn connect(app: AppHandle, port: String) -> CmdResult<CameraInfo> {
             matching_disc: matching_disc(&app, &volume),
             volume: volume.clone(),
         };
-        *slot = Some(Session { cam, conn, volume });
+        *slot = Some(Session { cam, conn, volume, browsed: None });
         Ok(info)
     })
     .await
@@ -276,37 +279,98 @@ fn cancel_import(state: State<AppState>) {
     state.cancel.store(true, Ordering::SeqCst);
 }
 
-/// Copy the disc in the camera into the library (or into `into`, an existing disc folder).
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CameraContents {
+    photos: Vec<CameraPhoto>,
+    /// For each photo, the library photo it already is.
+    in_library: Vec<Option<LibraryMatch>>,
+    /// The library folder that downloads from this disc go into, if it exists yet.
+    disc_path: Option<String>,
+}
+
+fn contents(app: &AppHandle, b: &CameraDisc) -> CameraContents {
+    let discs: Vec<Disc> = disc_paths(app).iter().filter_map(|p| library::scan_disc(p)).collect();
+    CameraContents {
+        in_library: library::match_camera(&discs, b),
+        photos: b.photos.clone(),
+        disc_path: matching_disc(app, &b.volume),
+    }
+}
+
+/// What's on the disc in the camera, with thumbnails and which photos are already in the
+/// library. Reads only the listing, index and thumbnail files; `refresh: false` reuses what an
+/// earlier call read (it just re-checks the library).
 #[tauri::command]
-async fn import_disc(app: AppHandle, name: String, into: Option<String>) -> CmdResult<Disc> {
+async fn browse_camera(app: AppHandle, refresh: bool) -> CmdResult<CameraContents> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let state = app.state::<AppState>();
+        state.cancel.store(false, Ordering::SeqCst);
+        let mut slot = state.session.lock().unwrap();
+        let session = slot.as_mut().ok_or("The camera is not connected.")?;
+        if refresh || session.browsed.is_none() {
+            let cache = session.volume.as_ref().and_then(|v| {
+                let key: String = v.fingerprint().chars().map(|c| if c.is_ascii_alphanumeric() { c } else { '_' }).collect();
+                Some(app.path().app_cache_dir().ok()?.join("camera").join(key))
+            });
+            let b = browse::browse(&mut session.cam, cache.as_deref(), &mut |ev: BrowseEvent| {
+                let _ = app.emit("browse-event", &ev);
+                if state.cancel.load(Ordering::SeqCst) { Err(Error::Cancelled) } else { Ok(()) }
+            });
+            match b {
+                Ok(b) => session.browsed = Some(b),
+                Err(Error::Cancelled) => {
+                    session.cam.abort();
+                    return Err("Cancelled.".into());
+                }
+                Err(e) => return Err(err(e)),
+            }
+        }
+        Ok(contents(&app, session.browsed.as_ref().unwrap()))
+    })
+    .await
+    .map_err(err)?
+}
+
+/// A new folder in the library for a disc seen for the first time: "Disc 1", "Disc 2", …
+fn new_disc_dir(app: &AppHandle) -> (PathBuf, String) {
+    let lib = library_dir(app, &app.state::<AppState>().settings.lock().unwrap());
+    let names: Vec<String> = disc_paths(app)
+        .iter()
+        .filter_map(|p| library::scan_disc(p).map(|d| d.name))
+        .collect();
+    let mut k = names.len() + 1;
+    loop {
+        let name = format!("Disc {k}");
+        let dir = lib.join(sanitize(&name));
+        if !dir.exists() && !names.contains(&name) {
+            return (dir, name);
+        }
+        k += 1;
+    }
+}
+
+/// Copy photos from the camera into the library: `paths` (camera paths of PSN files, with their
+/// sound) or, when `None`, the whole disc as a full backup. Photos from the same disc always go
+/// into that disc's folder (recognized by its label and format time).
+#[tauri::command]
+async fn download_photos(app: AppHandle, paths: Option<Vec<String>>) -> CmdResult<Disc> {
     tauri::async_runtime::spawn_blocking(move || {
         let state = app.state::<AppState>();
         state.cancel.store(false, Ordering::SeqCst);
         let mut slot = state.session.lock().unwrap();
         let session = slot.as_mut().ok_or("The camera is not connected.")?;
 
-        let dest = match into {
-            Some(p) => PathBuf::from(p),
-            None => {
-                let lib = library_dir(&app, &state.settings.lock().unwrap());
-                let base = sanitize(&name);
-                let mut d = lib.join(&base);
-                let mut k = 2;
-                while d.exists() {
-                    d = lib.join(format!("{base} {k}"));
-                    k += 1;
-                }
-                d
-            }
+        let (dest, name) = match matching_disc(&app, &session.volume) {
+            Some(p) => (PathBuf::from(p), String::new()),
+            None => new_disc_dir(&app),
         };
         fs::create_dir_all(&dest).map_err(err)?;
         allow_assets(&app, &dest);
-        if let Some(parent) = dest.parent() {
-            allow_assets(&app, parent);
-        }
 
-        let opts = ImportOptions { disc_dir: dest.clone(), name };
-        let result = import::import_disc(&mut session.cam, &opts, &mut |ev: ImportEvent| {
+        let opts = ImportOptions { disc_dir: dest.clone(), name, only: paths.map(|p| p.into_iter().collect()) };
+        let browsed = session.browsed.clone();
+        let result = import::import_disc(&mut session.cam, &opts, browsed.as_ref(), &mut |ev: ImportEvent| {
             let _ = app.emit("import-event", &ev);
             if state.cancel.load(Ordering::SeqCst) {
                 Err(Error::Cancelled)
@@ -315,10 +379,10 @@ async fn import_disc(app: AppHandle, name: String, into: Option<String>) -> CmdR
             }
         });
         match result {
-            Ok(_) => library::scan_disc(&dest).ok_or_else(|| "import finished but the folder is unreadable".into()),
+            Ok(_) => library::scan_disc(&dest).ok_or_else(|| "download finished but the folder is unreadable".into()),
             Err(Error::Cancelled) => {
                 session.cam.abort();
-                Err("Import cancelled. Files copied so far are kept; importing again resumes.".into())
+                Err("Download cancelled. Photos copied so far are in the library.".into())
             }
             Err(e) => Err(err(e)),
         }
@@ -598,6 +662,12 @@ fn diag_enabled() -> bool {
     std::env::var("MD1_DIAG").is_ok()
 }
 
+/// With MD1_DIAG_PORT (e.g. a fake camera's pty), the self-test also connects and browses.
+#[tauri::command]
+fn diag_port() -> Option<String> {
+    std::env::var("MD1_DIAG_PORT").ok()
+}
+
 #[tauri::command]
 fn diag_report(text: String) {
     eprintln!("DIAG {text}");
@@ -647,7 +717,8 @@ pub fn run() {
             disconnect,
             camera_status,
             cancel_import,
-            import_disc,
+            browse_camera,
+            download_photos,
             export_photos,
             edit_photos,
             auto_levels,
@@ -657,6 +728,7 @@ pub fn run() {
             map_tile,
             expand_url,
             diag_enabled,
+            diag_port,
             diag_report,
         ])
         .run(tauri::generate_context!())

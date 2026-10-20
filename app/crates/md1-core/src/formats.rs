@@ -109,6 +109,18 @@ pub fn all_jpegs(data: &[u8]) -> Vec<&[u8]> {
     out
 }
 
+/// The thumbnail in each 4096-byte block of a PMX file, by position (None for a block that
+/// doesn't hold a JPEG). Block header: JPEG length (BE32) at 0x0C, JPEG at 0x100.
+pub fn pmx_thumbnails(data: &[u8]) -> Vec<Option<&[u8]>> {
+    data.chunks(PMX_BLOCK)
+        .map(|b| {
+            let len = u32::from_be_bytes(b.get(0x0C..0x10)?.try_into().ok()?) as usize;
+            let j = b.get(PMP_HEADER..PMP_HEADER + len)?;
+            j.starts_with(&[0xFF, 0xD8]).then_some(j)
+        })
+        .collect()
+}
+
 /// Sound file → samples in [-1, 1] at 44.1 kHz mono.
 pub fn decode_pma(pma: &[u8]) -> Vec<f32> {
     atrac1::decode_mono(pma.get(PMA_HEADER..).unwrap_or(&[]))

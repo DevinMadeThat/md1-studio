@@ -484,3 +484,39 @@ textarea.caption:focus { border-color: var(--accent); background: rgba(255, 255,
 .ex-size input { position: absolute; opacity: 0; }
 .ex-size:has(input:checked) { border-color: var(--accent); background: var(--active); }
 .ex-opts { gap: 10px; }
+
+/* ------------------------------------------------ library sidebar */
+.nav-item.small-item { padding-top: 5px; padding-bottom: 5px; }
+
+/* ------------------------------------------------ camera browser */
+.camstrip {
+  display: flex; align-items: center; gap: 18px; flex-wrap: wrap;
+  padding: 8px 24px; border-bottom: 1px solid var(--line); background: var(--panel); font-size: 12px;
+}
+.camstrip > span { display: inline-flex; align-items: center; gap: 6px; }
+.cam-page { padding-top: 16px; }
+.cam-hint { margin: -4px 0 14px; }
+.refresh-link { margin-left: 10px; display: inline-flex; align-items: center; gap: 4px; font-weight: 400; }
+.browse-wait { max-width: 420px; margin: 60px auto; display: grid; gap: 10px; text-align: center; }
+.cam-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
+.cam-tile { cursor: pointer; }
+/* 80 × 64 thumbnails end in 4 blank rows; anchoring to the top crops exactly those. */
+.cam-tile img { object-position: center top; }
+.cam-tile.in-lib img { opacity: 0.55; }
+.cam-tile.in-lib.selected img { opacity: 1; }
+.lib-badge {
+  position: absolute; right: 6px; top: 6px; display: none; align-items: center; gap: 3px;
+  height: 18px; padding: 0 6px; border-radius: 5px; font-size: 10px; font-weight: 700; color: #fff;
+  background: var(--ok);
+}
+.cam-tile.in-lib .lib-badge { display: inline-flex; }
+.cam-tile.just .lib-badge { animation: pop 0.35s ease-out; }
+@keyframes pop { from { transform: scale(0.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+.actionbar {
+  flex: none; display: flex; align-items: center; gap: 16px;
+  padding: 12px 24px; border-top: 1px solid var(--line); background: var(--panel);
+}
+.ab-text { flex: 1; min-width: 0; }
+.ab-links { display: flex; gap: 14px; margin-top: 3px; }
+.ab-progress { flex: 1; min-width: 0; }
+.ab-progress .progress-meta { margin-top: 6px; }

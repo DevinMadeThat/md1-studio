@@ -3,8 +3,11 @@ import { listen } from "@tauri-apps/api/event";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open } from "@tauri-apps/plugin-dialog";
 import { openUrl, revealItemInDir } from "@tauri-apps/plugin-opener";
-import { api, fileUrl, type CameraInfo, type Disc, type ImportEvent, type Photo, type PortInfo, type Settings } from "./api";
-import { effectiveTaken, googleMapsUrl, openDateEditor, openExportSheet, openLocationEditor } from "./editors";
+import {
+  api, fileUrl, itemKey,
+  type BrowseEvent, type CameraContents, type CameraInfo, type CameraPhoto, type Disc, type ImportEvent, type Item, type Photo, type PortInfo, type Settings,
+} from "./api";
+import { effectiveTaken, googleMapsUrl, openDateEditor, openExportSheet, openLocationEditor, saveEdits } from "./editors";
 import { formatLatLon } from "./geo";
 import { icon } from "./icons";
 import { hasLook, renderedUrl } from "./look";
@@ -15,27 +18,25 @@ import { ZoomStage, type ZoomShared } from "./zoom";
 
 // ---------------------------------------------------------------- state
 
-type View = { kind: "camera" } | { kind: "disc"; path: string };
+type View = { kind: "camera" } | { kind: "library" } | { kind: "disc"; path: string };
 type Filter = "all" | "favorites" | "sound" | "fine";
 
 interface ImportState {
   running: boolean;
   label: string;
-  file: string;
-  fileIndex: number;
-  fileCount: number;
   done: number;
   total: number;
   rate: number;
   log: string[];
   error: string | null;
-  result: Disc | null;
+  /** Photos asked for (null = the whole disc). */
+  count: number | null;
 }
 
 const state = {
   settings: null as Settings | null,
   discs: [] as Disc[],
-  view: { kind: "camera" } as View,
+  view: { kind: "library" } as View,
   ports: [] as PortInfo[],
   port: "",
   manualPort: false,
@@ -43,20 +44,27 @@ const state = {
   connecting: false,
   connectLog: [] as string[],
   connectError: null as string | null,
-  importMode: "update" as "update" | "new",
-  importName: "",
   imp: null as ImportState | null,
   filter: "all" as Filter,
+  /** Library selection: item keys. */
   selection: new Set<string>(),
   /** Last photo clicked: the start of a shift-click range. */
   anchor: null as string | null,
   renaming: false,
+  /** The disc in the camera, seen through its thumbnails. */
+  cam: {
+    contents: null as CameraContents | null,
+    browsing: false,
+    done: 0,
+    total: 0,
+    error: null as string | null,
+    /** Camera photo ids. */
+    selection: new Set<string>(),
+    anchor: null as string | null,
+    /** Camera paths copied during the current download. */
+    stored: new Set<string>(),
+  },
 };
-
-/** Replace a disc after an edit, keeping the user's place. */
-function updateDisc(d: Disc) {
-  state.discs = state.discs.map((x) => (x.path === d.path ? d : x));
-}
 
 const $ = <T extends HTMLElement = HTMLElement>(sel: string, root: ParentNode = document) => root.querySelector<T>(sel)!;
 const fmtBytes = (n: number) =>
@@ -65,16 +73,71 @@ const fmtSecs = (s: number) => {
   s = Math.max(0, Math.round(s));
   return s >= 60 ? `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}` : `0:${String(s).padStart(2, "0")}`;
 };
+const fmtDuration = (s: number) => (s < 90 ? `${Math.max(1, Math.round(s / 5) * 5)} seconds` : `${Math.round(s / 60)} minutes`);
 const plural = (n: number, w: string) => `${n} ${w}${n === 1 ? "" : "s"}`;
+/** Typical read speed at 115,200 baud (2 KB blocks); used until a download measures it. */
+const TYPICAL_RATE = 9000;
 
+// ---------------------------------------------------------------- library items
+
+const discItems = (d: Disc): Item[] => d.albums.flatMap((a) => a.photos.map((photo) => ({ key: itemKey(d, photo), disc: d, photo })));
+const allItems = (): Item[] => state.discs.flatMap(discItems);
+const itemByKey = (key: string) => allItems().find((it) => it.key === key);
 const currentDisc = () => (state.view.kind === "disc" ? state.discs.find((d) => d.path === (state.view as any).path) : undefined);
 
-function visiblePhotos(d: Disc): Photo[] {
-  const all = d.albums.flatMap((a) => a.photos);
-  if (state.filter === "favorites") return all.filter((p) => p.edits.favorite);
-  if (state.filter === "sound") return all.filter((p) => p.soundSeconds != null);
-  if (state.filter === "fine") return all.filter((p) => p.info.quality === "FINE");
-  return all;
+function passes(p: Photo) {
+  if (state.filter === "favorites") return !!p.edits.favorite;
+  if (state.filter === "sound") return p.soundSeconds != null;
+  if (state.filter === "fine") return p.info.quality === "FINE";
+  return true;
+}
+
+/** "2026-10-19" in local time. */
+const localDay = (iso: string) => {
+  const t = new Date(iso);
+  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
+};
+const longDay = (iso: string) => new Date(iso).toLocaleDateString(undefined, { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+
+interface Group { title: string; sub: string; items: Item[] }
+
+/** What the grid shows, in display order: the whole library by import (newest first), or one
+ * disc folder by album. */
+function groups(): Group[] {
+  if (state.view.kind === "disc") {
+    const d = currentDisc();
+    if (!d) return [];
+    return d.albums.map((a) => ({
+      title: d.albums.length > 1 ? a.name : "",
+      sub: "",
+      items: a.photos.filter(passes).map((photo) => ({ key: itemKey(d, photo), disc: d, photo })),
+    }));
+  }
+  const byKey = new Map<string, Group & { at: string }>();
+  for (const it of allItems()) {
+    if (!passes(it.photo)) continue;
+    const at = it.photo.importedAt ?? "";
+    const k = `${at ? localDay(at) : ""}|${it.disc.path}`;
+    let g = byKey.get(k);
+    if (!g) {
+      g = { title: at ? `Imported ${longDay(at)}` : "Imported earlier", sub: it.disc.name, items: [], at };
+      byKey.set(k, g);
+    }
+    if (at > g.at) g.at = at;
+    g.items.push(it);
+  }
+  return [...byKey.values()].sort((a, b) => b.at.localeCompare(a.at) || a.sub.localeCompare(b.sub));
+}
+
+const visibleItems = () => groups().flatMap((g) => g.items);
+
+/** Replace discs after an edit or a download. */
+function applyDiscs(updated: Disc[]) {
+  for (const d of updated) {
+    const i = state.discs.findIndex((x) => x.path === d.path);
+    if (i >= 0) state.discs[i] = d;
+    else state.discs.push(d);
+  }
 }
 
 // ---------------------------------------------------------------- sidebar
@@ -82,15 +145,16 @@ function visiblePhotos(d: Disc): Photo[] {
 function renderSidebar() {
   const cam = state.camera;
   const camLine = cam
-    ? `${esc(cam.status.pictures)} photos · ${cam.connection.baud === 115200 ? "fast link" : `${cam.connection.baud} baud`}`
+    ? `${plural(cam.status.pictures, "photo")} · ${cam.connection.baud === 115200 ? "fast link" : `${cam.connection.baud} baud`}`
     : state.connecting ? "Connecting…" : "Not connected";
+  const total = state.discs.reduce((n, d) => n + d.photoCount, 0);
   const discs = state.discs
     .map((d) => {
       const active = state.view.kind === "disc" && state.view.path === d.path;
-      return `<button class="nav-item ${active ? "active" : ""}" data-disc="${esc(d.path)}" title="${esc(d.path)}">
-        <span class="nav-icon">${icon.disc()}</span>
-        <span class="nav-text"><span class="nav-title">${esc(d.name)}</span>
-        <span class="nav-sub">${plural(d.photoCount, "photo")}${d.soundCount ? ` · ${d.soundCount} with sound` : ""}</span></span>
+      const sub = [plural(d.photoCount, "photo"), d.missingPhotos ? `${d.missingPhotos} not downloaded` : d.soundCount ? `${d.soundCount} with sound` : ""].filter(Boolean).join(" · ");
+      return `<button class="nav-item small-item ${active ? "active" : ""}" data-disc="${esc(d.path)}" title="${esc(d.path)}">
+        <span class="nav-icon">${icon.disc(15)}</span>
+        <span class="nav-text"><span class="nav-title">${esc(d.name)}</span><span class="nav-sub">${sub}</span></span>
       </button>`;
     })
     .join("");
@@ -103,7 +167,11 @@ function renderSidebar() {
       <span class="dot ${cam ? "on" : state.connecting ? "busy" : ""}"></span>
     </button>
     <div class="nav-section">Library</div>
-    ${discs || `<div class="nav-empty">No discs yet</div>`}
+    <button class="nav-item ${state.view.kind === "library" ? "active" : ""}" data-nav="library">
+      <span class="nav-icon">${icon.photos()}</span>
+      <span class="nav-text"><span class="nav-title">All photos</span><span class="nav-sub">${plural(total, "photo")}</span></span>
+    </button>
+    ${state.discs.length ? `<div class="nav-section">Discs</div>${discs}` : ""}
     <button class="nav-add" data-action="add-folder">${icon.plus(14)} Add backup folder…</button>
     <div class="sidebar-foot">
       <div class="foot-label">Library folder</div>
@@ -123,113 +191,171 @@ function powerBar(power: number) {
   return `<span class="power">${segs}</span>`;
 }
 
+function renderConnect() {
+  const opts = state.ports
+    .map((p) => `<option value="${esc(p.path)}" ${p.path === state.port ? "selected" : ""}>${esc(p.path.replace("/dev/", ""))}${p.description ? ` — ${esc(p.description)}` : ""}${p.likely_adapter ? " ★" : ""}</option>`)
+    .join("");
+  $("#main").innerHTML = `
+    <header class="toolbar" data-drag><div class="tb-title">Camera</div></header>
+    <div class="page">
+      <section class="hero">
+        <div class="hero-art">${icon.camera(44)}</div>
+        <h1>Connect your DSC-MD1</h1>
+        <p class="lede">See the photos on the disc, then copy the ones you want, with their recorded sound. Nothing on the disc is changed.</p>
+        <ol class="steps">
+          <li><b>Cable</b> — USB-serial adapter + DB9 ↔ 3.5 mm cable into the camera's <b>DIGITAL I/O</b> jack (the lowest of the three).</li>
+          <li><b>Playback mode</b> — function switch to <b>再生</b> (PLAY).</li>
+          <li><b>IrDA off</b> — MENU → 準備 (SETUP) → IrDA → <b>OFF</b>. With IrDA on, the jack is silent.</li>
+        </ol>
+        <div class="connect-row">
+          ${state.manualPort
+            ? `<input id="port-input" class="field grow" placeholder="/dev/cu.usbserial-…" value="${esc(state.port)}" spellcheck="false">`
+            : `<select id="port-select" class="field grow">${opts || `<option value="">No serial ports found — plug in the adapter</option>`}</select>`}
+          <button class="btn icon-btn" data-action="refresh-ports" title="Refresh ports">${icon.refresh()}</button>
+          <button class="btn primary" data-action="connect" ${state.connecting || !state.port ? "disabled" : ""}>${state.connecting ? `<span class="spinner"></span> Connecting…` : "Connect"}</button>
+        </div>
+        <button class="linkish" data-action="toggle-manual">${state.manualPort ? "Choose from the list" : "Enter a port path by hand"}</button>
+        ${state.connectError ? `<div class="callout error">${esc(state.connectError)}</div>` : ""}
+        ${state.connectLog.length ? `<pre class="log">${esc(state.connectLog.join("\n"))}</pre>` : ""}
+      </section>
+    </div>`;
+}
+
+/** Camera photos with what the library knows about them. */
+function cameraRows() {
+  const c = state.cam.contents;
+  if (!c) return [];
+  return c.photos.map((p, i) => {
+    const m = c.inLibrary[i];
+    const inLib = !!m || state.cam.stored.has(p.path);
+    return { p, match: m, inLib };
+  });
+}
+
+/** Library items for camera photos that are already downloaded, in camera order. */
+function cameraLibraryItems(): Item[] {
+  const out: Item[] = [];
+  for (const { match } of cameraRows()) {
+    const d = match && state.discs.find((x) => x.path === match.discPath);
+    const photo = d && d.albums.flatMap((a) => a.photos).find((x) => x.id === match!.photoId);
+    if (d && photo) out.push({ key: itemKey(d, photo), disc: d, photo });
+  }
+  return out;
+}
+
 function renderCamera() {
+  keepScroll(state.camera ? "camera" : "connect", drawCamera);
+}
+
+function drawCamera() {
   const cam = state.camera;
-  const main = $("#main");
-  if (!cam) {
-    const opts = state.ports
-      .map((p) => `<option value="${esc(p.path)}" ${p.path === state.port ? "selected" : ""}>${esc(p.path.replace("/dev/", ""))}${p.description ? ` — ${esc(p.description)}` : ""}${p.likely_adapter ? " ★" : ""}</option>`)
-      .join("");
-    main.innerHTML = `
-      <header class="toolbar" data-drag><div class="tb-title">Camera</div></header>
-      <div class="page">
-        <section class="hero">
-          <div class="hero-art">${icon.camera(44)}</div>
-          <h1>Connect your DSC-MD1</h1>
-          <p class="lede">Copy every photo and its recorded sound off the MiniDisc, byte for byte. Nothing on the disc is changed.</p>
-          <ol class="steps">
-            <li><b>Cable</b> — USB-serial adapter + DB9 ↔ 3.5 mm cable into the camera's <b>DIGITAL I/O</b> jack (the lowest of the three).</li>
-            <li><b>Playback mode</b> — function switch to <b>再生</b> (PLAY).</li>
-            <li><b>IrDA off</b> — MENU → 準備 (SETUP) → IrDA → <b>OFF</b>. With IrDA on, the jack is silent.</li>
-          </ol>
-          <div class="connect-row">
-            ${state.manualPort
-              ? `<input id="port-input" class="field grow" placeholder="/dev/cu.usbserial-…" value="${esc(state.port)}" spellcheck="false">`
-              : `<select id="port-select" class="field grow">${opts || `<option value="">No serial ports found — plug in the adapter</option>`}</select>`}
-            <button class="btn icon-btn" data-action="refresh-ports" title="Refresh ports">${icon.refresh()}</button>
-            <button class="btn primary" data-action="connect" ${state.connecting || !state.port ? "disabled" : ""}>${state.connecting ? `<span class="spinner"></span> Connecting…` : "Connect"}</button>
-          </div>
-          <button class="linkish" data-action="toggle-manual">${state.manualPort ? "Choose from the list" : "Enter a port path by hand"}</button>
-          ${state.connectError ? `<div class="callout error">${esc(state.connectError)}</div>` : ""}
-          ${state.connectLog.length ? `<pre class="log">${esc(state.connectLog.join("\n"))}</pre>` : ""}
-        </section>
-      </div>`;
-    return;
+  if (!cam) return renderConnect();
+  const imp = state.imp;
+  const cs = state.cam;
+  const rows = cameraRows();
+  const fresh = rows.filter((r) => !r.inLib);
+  const chosen = rows.filter((r) => cs.selection.has(r.p.id));
+  const bytesOf = (list: typeof rows) => list.reduce((n, r) => n + r.p.size + (r.p.soundSize ?? 0), 0);
+  const rate = imp?.rate || TYPICAL_RATE;
+
+  const strip = camStrip(cam);
+
+  let body: string;
+  if (cs.browsing) {
+    const pct = cs.total ? Math.min(100, (cs.done / cs.total) * 100) : 0;
+    body = `<div class="browse-wait">
+      <div class="muted">Reading the camera's thumbnails…</div>
+      <div class="progress" id="browse-progress"><i style="width:${pct.toFixed(1)}%"></i></div>
+      <div class="muted small" id="browse-meta">${cs.total ? `${fmtBytes(cs.done)} of ${fmtBytes(cs.total)}` : "Listing the disc"}</div>
+    </div>`;
+  } else if (cs.error) {
+    body = `<div class="callout error">${esc(cs.error)}</div><button class="btn" data-action="browse">Try again</button>`;
+  } else if (!cs.contents) {
+    body = `<button class="btn primary" data-action="browse">${icon.photos(15)} Show photos on the camera</button>`;
+  } else if (!rows.length) {
+    body = `<div class="empty">There are no photos on this disc.</div>`;
+  } else {
+    body = `<div class="grid cam-grid">${rows.map((r) => camTile(r.p, r.inLib)).join("")}</div>`;
   }
 
-  const v = cam.volume;
-  const match = cam.matchingDisc ? state.discs.find((d) => d.path === cam.matchingDisc) : undefined;
-  const usedPct = v && v.total_bytes ? Math.round(((v.total_bytes - v.free_bytes) / v.total_bytes) * 100) : 0;
-  const imp = state.imp;
-  if (!state.importName) state.importName = match?.name ?? `Disc ${state.discs.length + 1}`;
-  const statusCard = `
-    <section class="card">
-      <div class="card-head">${icon.camera(18)}<h2>Camera</h2><span class="pill ok">Connected</span></div>
-      <dl class="facts">
-        <dt>Model</dt><dd>DSC-MD1 · firmware ${esc(cam.connection.camera_id.trim().split(/\s+/).pop())} <span class="muted small">(${esc(cam.connection.camera_id.replace(/\s+/g, " ").trim())})</span></dd>
-        <dt>Port</dt><dd>${esc(cam.connection.port.replace("/dev/", ""))} · ${cam.connection.baud.toLocaleString()} baud</dd>
-        <dt>Mode</dt><dd>${esc(cam.status.mode_name)}</dd>
-        <dt>Power</dt><dd>${powerBar(cam.status.power)} ${cam.status.power < 3 ? `<span class="warn-text">low</span>` : ""}</dd>
-        <dt>Clock</dt><dd>${cam.status.clock_set ? esc(cam.status.clock) : `<span class="muted">not set</span>`}</dd>
-      </dl>
-      <div class="card-actions"><button class="btn" data-action="disconnect" ${imp?.running ? "disabled" : ""}>Disconnect</button></div>
-    </section>`;
-  const discCard = `
-    <section class="card">
-      <div class="card-head">${icon.disc(18)}<h2>Disc in the camera</h2></div>
-      <dl class="facts">
-        <dt>Photos</dt><dd>${cam.status.pictures} in the current album</dd>
-        ${v ? `<dt>Label</dt><dd>${esc(v.label || "—")}</dd>
-        <dt>Formatted</dt><dd>${v.created.year > 1980 ? `${v.created.year}-${String(v.created.month).padStart(2, "0")}-${String(v.created.day).padStart(2, "0")}` : `<span class="muted">unknown (clock not set)</span>`}</dd>
-        <dt>Space</dt><dd><span class="meter"><i style="width:${usedPct}%"></i></span> ${fmtBytes(v.free_bytes)} free of ${fmtBytes(v.total_bytes)}</dd>` : ""}
-      </dl>
-    </section>`;
-
-  let importCard: string;
-  if (imp?.running || imp?.error || imp?.result) {
+  let bar = "";
+  if (imp) {
     const pct = imp.total ? Math.min(100, (imp.done / imp.total) * 100) : 0;
     const eta = imp.rate > 0 ? (imp.total - imp.done) / imp.rate : 0;
-    importCard = `
-      <section class="card wide">
-        <div class="card-head">${icon.export(18)}<h2>${imp.running ? "Importing…" : imp.error ? "Import stopped" : "Import complete"}</h2></div>
-        <div id="imp-progress">${importProgressHtml(imp, pct, eta)}</div>
-        ${imp.error ? `<div class="callout error">${esc(imp.error)}</div>` : ""}
-        <div class="card-actions">
-          ${imp.running ? `<button class="btn" data-action="cancel-import">Cancel</button>` : ""}
-          ${imp.result ? `<button class="btn primary" data-open-disc="${esc(imp.result.path)}">Open “${esc(imp.result.name)}”</button>` : ""}
-          ${!imp.running ? `<button class="btn" data-action="import-again">${imp.error ? "Try again" : "Done"}</button>` : ""}
+    bar = `<div class="actionbar">
+      <div class="ab-progress" id="imp-progress">${importProgressHtml(imp, pct, eta)}</div>
+      ${imp.running ? `<button class="btn" data-action="cancel-import">Stop</button>` : `<button class="btn" data-action="import-done">OK</button>`}
+    </div>`;
+  } else if (cs.contents && rows.length) {
+    const target = chosen.length ? chosen : fresh;
+    bar = `<div class="actionbar">
+      <div class="ab-text">
+        ${chosen.length
+          ? `<b>${plural(chosen.length, "photo")} selected</b>`
+          : fresh.length ? `<b>${plural(fresh.length, "new photo")}</b> not in your library yet` : `<b>Everything on this disc is in your library.</b>`}
+        ${target.length ? `<span class="muted"> · ${fmtBytes(bytesOf(target))} · about ${fmtDuration(bytesOf(target) / rate)}</span>` : ""}
+        <div class="ab-links">
+          ${fresh.length && fresh.length !== chosen.length ? `<button class="linkish" data-action="cam-select-new">Select new</button>` : ""}
+          <button class="linkish" data-action="cam-select-all">Select all</button>
+          ${chosen.length ? `<button class="linkish" data-action="cam-clear">Clear</button>` : ""}
+          <button class="linkish" data-action="backup-disc" title="Copy every file on the disc, including index files, so the disc can be restored later">Back up the whole disc…</button>
         </div>
-      </section>`;
-  } else {
-    importCard = `
-      <section class="card wide">
-        <div class="card-head">${icon.export(18)}<h2>Import this disc</h2></div>
-        <p class="muted small">Copies every file on the disc into your library (photos, sound, thumbnails and the disc's index files, so it can be restored later). Photos already imported are skipped. At 115,200 baud a photo takes about 10 seconds.</p>
-        ${match ? `
-          <div class="choice">
-            <label><input type="radio" name="imode" value="update" ${state.importMode === "update" ? "checked" : ""}> Update <b>${esc(match.name)}</b> <span class="muted">— this disc was imported before</span></label>
-            <label><input type="radio" name="imode" value="new" ${state.importMode === "new" ? "checked" : ""}> Import as a new disc</label>
-          </div>` : ""}
-        <div class="connect-row">
-          <input id="import-name" class="field grow" value="${esc(state.importName)}" placeholder="Disc name" ${match && state.importMode === "update" ? "disabled" : ""}>
-          <button class="btn primary" data-action="import">${icon.export(15)} Import</button>
-        </div>
-      </section>`;
+      </div>
+      <button class="btn primary" data-action="download" ${target.length ? "" : "disabled"}>${icon.download(15)} ${chosen.length ? `Download ${plural(chosen.length, "photo")}` : fresh.length ? `Download ${fresh.length} new` : "Download"}</button>
+    </div>`;
   }
 
-  main.innerHTML = `
-    <header class="toolbar" data-drag><div class="tb-title">Camera</div></header>
-    <div class="page"><div class="cards">${statusCard}${discCard}${importCard}</div></div>`;
+  const head = cs.contents && rows.length
+    ? `<h3 class="album-head">On the camera <span class="muted">${plural(rows.length, "photo")}${rows.length - fresh.length ? ` · ${rows.length - fresh.length} already in your library` : ""}</span>
+         <button class="linkish refresh-link" data-action="browse-refresh" ${imp?.running ? "disabled" : ""}>${icon.refresh(12)} Refresh</button></h3>
+       <p class="muted small cam-hint">Click to choose photos, shift-click for a range. Thumbnails are the camera's own (80 × 60); double-click one that's already in your library to open it.</p>`
+    : "";
+
+  $("#main").innerHTML = `
+    <header class="toolbar" data-drag>
+      <div class="tb-title">Camera <span class="tb-sub">DSC-MD1 · firmware ${esc(cam.connection.camera_id.trim().split(/\s+/).pop())}</span></div>
+      <button class="btn" data-action="disconnect" ${imp?.running || cs.browsing ? "disabled" : ""}>Disconnect</button>
+    </header>
+    ${strip}
+    <div class="page cam-page">${head}${body}</div>
+    ${bar}`;
+}
+
+function camStrip(cam: CameraInfo) {
+  const v = cam.volume;
+  return `<div class="camstrip">
+      <span title="Battery">${powerBar(cam.status.power)}${cam.status.power < 3 ? ` <span class="warn-text">low</span>` : ""}</span>
+      <span><span class="muted">Mode</span> ${esc(cam.status.mode_name)}</span>
+      <span><span class="muted">Clock</span> ${cam.status.clock_set ? esc(cam.status.clock) : "not set"}</span>
+      ${v ? `<span><span class="muted">Disc</span> ${esc(v.label || "unlabelled")} · ${fmtBytes(v.free_bytes)} free</span>` : ""}
+      <span class="spacer"></span>
+      <span class="muted small">${esc(cam.connection.port.replace("/dev/", ""))} · ${cam.connection.baud.toLocaleString()} baud</span>
+    </div>`;
+}
+
+function camTile(p: CameraPhoto, inLib: boolean) {
+  const sel = state.cam.selection.has(p.id);
+  return `<div class="tile cam-tile ${sel ? "selected" : ""} ${inLib ? "in-lib" : ""}" data-cam="${esc(p.id)}" data-cam-path="${esc(p.path)}" tabindex="0">
+    ${p.thumb ? `<img src="${p.thumb}" alt="${esc(p.stem)}" draggable="false">` : `<div class="noimg">no thumbnail</div>`}
+    <button class="tile-check" data-cam-select="${esc(p.id)}" title="Select">${icon.check(13)}</button>
+    <span class="lib-badge" title="Already in your library">${icon.check(11)} In library</span>
+    <div class="tile-badges">
+      ${p.protected ? `<span class="badge plain" title="Protected on the camera">${icon.lock(11)}</span>` : ""}
+      ${p.soundSeconds != null ? `<span class="badge sound" title="Has sound (${p.soundSeconds.toFixed(1)} s)">${icon.sound(12)}</span>` : ""}
+      ${p.quality === "FINE" ? `<span class="badge">FINE</span>` : ""}
+      ${!p.inIndex ? `<span class="badge warn" title="Not in the camera's album index">hidden</span>` : ""}
+    </div>
+    <div class="tile-num">${p.position + 1}</div>
+  </div>`;
 }
 
 function importProgressHtml(imp: ImportState, pct: number, eta: number) {
   return `
     <div class="progress"><i style="width:${pct.toFixed(1)}%"></i></div>
     <div class="progress-meta">
-      <span>${esc(imp.label)}</span>
+      <span>${esc(imp.error ?? imp.label)}</span>
       <span>${imp.total ? `${fmtBytes(imp.done)} of ${fmtBytes(imp.total)}` : ""}${imp.running && imp.rate > 0 ? ` · ${fmtBytes(imp.rate)}/s · ${fmtSecs(eta)} left` : ""}</span>
-    </div>
-    ${imp.log.length ? `<pre class="log small">${esc(imp.log.slice(-6).join("\n"))}</pre>` : ""}`;
+    </div>`;
 }
 
 function updateImportProgress() {
@@ -241,63 +367,66 @@ function updateImportProgress() {
   el.innerHTML = importProgressHtml(imp, pct, eta);
 }
 
-// ---------------------------------------------------------------- disc view
+// ---------------------------------------------------------------- library grid
 
-function renderDisc(d: Disc) {
-  const photos = visiblePhotos(d);
-  const albums = d.albums.length > 1;
+function tile(it: Item) {
+  const p = it.photo;
+  const selected = state.selection.has(it.key);
+  return `<div class="tile ${selected ? "selected" : ""}" data-photo="${esc(it.key)}" tabindex="0">
+    ${p.jpegPath
+      ? hasLook(p.edits)
+        ? `<img alt="${esc(p.stem)}" data-render="${esc(it.key)}" class="pending">`
+        : `<img loading="lazy" src="${fileUrl(p.jpegPath)}" alt="${esc(p.stem)}" class="rot${p.edits.rotation ?? 0}">`
+      : `<div class="noimg">no image</div>`}
+    ${p.edits.favorite ? `<span class="tile-fav" title="Favourite">★</span>` : ""}
+    <button class="tile-check" data-select="${esc(it.key)}" title="Select (shift-click for a range)">${icon.check(13)}</button>
+    <div class="tile-badges">
+      ${p.edits.caption ? `<span class="badge plain" title="${esc(p.edits.caption)}">“”</span>` : ""}
+      ${p.edits.location ? `<span class="badge plain" title="${esc(p.edits.location.name || formatLatLon(p.edits.location))}">${icon.pin(12)}</span>` : ""}
+      ${p.soundSeconds != null ? `<span class="badge sound" title="Has sound (${p.soundSeconds.toFixed(1)} s)">${icon.sound(12)}</span>` : ""}
+      ${p.info.quality === "FINE" ? `<span class="badge">FINE</span>` : ""}
+      ${!p.inIndex ? `<span class="badge warn" title="Not in the camera's album index">hidden</span>` : ""}
+    </div>
+    <div class="tile-num">${p.number + 1}</div>
+  </div>`;
+}
+
+function renderGrid() {
+  keepScroll(state.view.kind === "disc" ? `disc:${state.view.path}` : "library", drawGrid);
+}
+
+function drawGrid() {
+  const d = currentDisc();
+  const gs = groups().filter((g) => g.items.length);
   const sel = state.selection;
-  const tiles = (list: Photo[]) =>
-    list
-      .map((p) => {
-        const selected = sel.has(p.id);
-        return `<div class="tile ${selected ? "selected" : ""}" data-photo="${esc(p.id)}" tabindex="0">
-          ${p.jpegPath
-            ? hasLook(p.edits)
-              ? `<img alt="${esc(p.stem)}" data-render="${esc(p.id)}" class="pending">`
-              : `<img loading="lazy" src="${fileUrl(p.jpegPath)}" alt="${esc(p.stem)}" class="rot${p.edits.rotation ?? 0}">`
-            : `<div class="noimg">no image</div>`}
-          ${p.edits.favorite ? `<span class="tile-fav" title="Favourite">★</span>` : ""}
-          <button class="tile-check" data-select="${esc(p.id)}" title="Select (shift-click for a range)">${icon.check(13)}</button>
-          <div class="tile-badges">
-            ${p.edits.caption ? `<span class="badge plain" title="${esc(p.edits.caption)}">“”</span>` : ""}
-            ${p.edits.location ? `<span class="badge plain" title="${esc(p.edits.location.name || formatLatLon(p.edits.location))}">${icon.pin(12)}</span>` : ""}
-            ${p.soundSeconds != null ? `<span class="badge sound" title="Has sound (${p.soundSeconds.toFixed(1)} s)">${icon.sound(12)}</span>` : ""}
-            ${p.info.quality === "FINE" ? `<span class="badge">FINE</span>` : ""}
-            ${!p.inIndex ? `<span class="badge warn" title="Not in the camera's album index">hidden</span>` : ""}
-          </div>
-          <div class="tile-num">${p.number + 1}</div>
-        </div>`;
-      })
-      .join("");
-  const body = albums
-    ? d.albums
-        .map((a) => {
-          const list = a.photos.filter((p) => photos.includes(p));
-          return list.length ? `<h3 class="album-head">${esc(a.name)} <span class="muted">${plural(list.length, "photo")}</span></h3><div class="grid">${tiles(list)}</div>` : "";
-        })
-        .join("")
-    : `<div class="grid">${tiles(photos)}</div>`;
-
+  const selItems = selectedItems();
+  const scope = d ? discItems(d) : allItems();
+  const count = (f: (p: Photo) => boolean) => scope.filter((it) => f(it.photo)).length;
   const subtitle = [
-    plural(d.photoCount, "photo"),
-    d.soundCount ? `${d.soundCount} with sound` : null,
-    d.fineCount ? `${d.fineCount} fine` : null,
+    plural(scope.length, "photo"),
+    count((p) => p.soundSeconds != null) ? `${count((p) => p.soundSeconds != null)} with sound` : null,
+    count((p) => p.info.quality === "FINE") ? `${count((p) => p.info.quality === "FINE")} fine` : null,
   ].filter(Boolean).join(" · ");
+  const title = d
+    ? state.renaming
+      ? `<input id="rename" class="field rename" value="${esc(d.name)}">`
+      : `<span class="disc-name" data-action="rename" title="Click to rename">${esc(d.name)}</span>`
+    : `All photos`;
+
+  const body = gs.length
+    ? gs.map((g) => `${g.title ? `<h3 class="album-head">${esc(g.title)}${g.sub ? ` <span class="muted">${esc(g.sub)} · ${plural(g.items.length, "photo")}</span>` : ` <span class="muted">${plural(g.items.length, "photo")}</span>`}</h3>` : ""}<div class="grid">${g.items.map(tile).join("")}</div>`).join("")
+    : scope.length
+      ? `<div class="empty">No ${{ all: "photos", favorites: "favourites (press F in the viewer, or ★ in the selection bar)", sound: "photos with sound", fine: "fine-quality photos" }[state.filter]} here.</div>`
+      : `<div class="empty">Your library is empty. Connect the camera to pick photos to download${state.discs.length ? "" : ", or add a backup folder made with md1tool"}.</div>`;
 
   $("#main").innerHTML = `
     <header class="toolbar" data-drag>
-      <div class="tb-title">
-        ${state.renaming
-          ? `<input id="rename" class="field rename" value="${esc(d.name)}">`
-          : `<span class="disc-name" data-action="rename" title="Click to rename">${esc(d.name)}</span>`}
-        <span class="tb-sub">${subtitle}</span>
-      </div>
+      <div class="tb-title">${title}<span class="tb-sub">${subtitle}</span></div>
       <div class="seg">
         ${(["all", "favorites", "sound", "fine"] as Filter[]).map((f) => `<button class="${state.filter === f ? "on" : ""}" data-filter="${f}">${{ all: "All", favorites: "★", sound: "Sound", fine: "Fine" }[f]}</button>`).join("")}
       </div>
-      <button class="btn icon-btn" data-action="reveal-disc" title="Show in ${state.settings?.platform === "macos" ? "Finder" : "file manager"}">${icon.finder()}</button>
-      <button class="btn" data-action="export">${icon.export(15)} ${sel.size ? `Export ${sel.size}` : "Export all"}…</button>
+      ${d ? `<button class="btn icon-btn" data-action="reveal-disc" title="Show in ${state.settings?.platform === "macos" ? "Finder" : "file manager"}">${icon.finder()}</button>` : ""}
+      <button class="btn" data-action="export" ${scope.length ? "" : "disabled"}>${icon.export(15)} ${sel.size ? `Export ${sel.size}` : "Export all"}…</button>
     </header>
     ${sel.size ? `<div class="selbar">
       <span class="selcount">${plural(sel.size, "photo")} selected</span>
@@ -305,18 +434,19 @@ function renderDisc(d: Disc) {
       <button class="btn small" data-action="sel-date">${icon.calendar(14)} Date &amp; time…</button>
       <button class="btn small icon-btn" data-action="sel-rotate-left" title="Rotate left">${icon.rotateLeft(14)}</button>
       <button class="btn small icon-btn" data-action="sel-rotate-right" title="Rotate right">${icon.rotateRight(14)}</button>
-      <button class="btn small" data-action="sel-favorite" title="Favourite (F)">★ ${[...sel].every((id) => d.albums.some((a) => a.photos.some((p) => p.id === id && p.edits.favorite))) ? "Unfavourite" : "Favourite"}</button>
+      <button class="btn small" data-action="sel-favorite" title="Favourite (F)">★ ${selItems.length && selItems.every((it) => it.photo.edits.favorite) ? "Unfavourite" : "Favourite"}</button>
       <button class="btn small" data-action="sel-auto" title="Auto-enhance colour and brightness">✨ Auto-enhance</button>
       <span class="spacer"></span>
       <button class="linkish" data-action="select-all">Select all</button>
       <button class="linkish" data-action="clear-selection">Clear</button>
     </div>` : ""}
     <div class="page">
-      ${d.kind === "photos" ? `<div class="callout">This backup holds photo files only (it was made before full-disc copies). Put this disc back in the camera and import it to add its sound recordings, thumbnails and shot times.</div>` : ""}
-      ${photos.length ? body : `<div class="empty">No ${{ all: "photos", favorites: "favourites (press F in the viewer, or ★ in the selection bar)", sound: "photos with sound", fine: "fine-quality photos" }[state.filter]} on this disc.</div>`}
+      ${d?.kind === "photos" ? `<div class="callout">This backup holds photo files only (it was made before full-disc copies), so it has no sound recordings or shot times.</div>` : ""}
+      ${d?.missingPhotos ? `<div class="callout">${plural(d.missingPhotos, "photo")} on this disc ${d.missingPhotos === 1 ? "hasn't" : "haven't"} been downloaded. Put the disc in the camera and connect to pick them.</div>` : ""}
+      ${body}
     </div>`;
-  fillRenderedTiles(d);
-  if (state.renaming) {
+  fillRenderedTiles();
+  if (d && state.renaming) {
     const inp = $<HTMLInputElement>("#rename");
     inp.focus();
     inp.select();
@@ -335,21 +465,26 @@ function renderDisc(d: Disc) {
 }
 
 /** Tiles of edited photos show a rendered preview (generated in the background, cached). */
-function fillRenderedTiles(d: Disc) {
+function fillRenderedTiles() {
   document.querySelectorAll<HTMLImageElement>("img[data-render]").forEach((img) => {
-    const p = d.albums.flatMap((a) => a.photos).find((x) => x.id === img.dataset.render);
-    if (!p) return;
-    renderedUrl(p, 480).then((u) => { img.src = u; img.classList.remove("pending"); }, () => { img.src = fileUrl(p.jpegPath!); });
+    const it = itemByKey(img.dataset.render!);
+    if (!it) return;
+    renderedUrl(it.photo, 480).then((u) => { img.src = u; img.classList.remove("pending"); }, () => { img.src = fileUrl(it.photo.jpegPath!); });
   });
+}
+
+function selectedItems(): Item[] {
+  return allItems().filter((it) => state.selection.has(it.key));
 }
 
 // ---------------------------------------------------------------- viewer
 
 const viewer = {
   open: false,
-  list: [] as Photo[],
+  list: [] as Item[],
   index: 0,
-  disc: null as Disc | null,
+  /** Where the list comes from (re-read after edits). */
+  source: visibleItems as () => Item[],
   audio: null as HTMLAudioElement | null,
   raf: 0,
   stage: null as ZoomStage | null,
@@ -359,12 +494,14 @@ const viewer = {
 const zoom: ZoomShared = { z: 1, nx: 0, ny: 0 };
 const playback = { auto: prefs.get("autoplay", false), loop: prefs.get("loop", false) };
 
-function openViewer(d: Disc, id: string) {
-  viewer.disc = d;
-  viewer.list = visiblePhotos(d);
-  viewer.index = Math.max(0, viewer.list.findIndex((p) => p.id === id));
+const viewerItem = () => viewer.list[viewer.index];
+
+function openViewer(key: string, source: () => Item[] = visibleItems) {
+  viewer.source = source;
+  viewer.list = source();
+  viewer.index = Math.max(0, viewer.list.findIndex((it) => it.key === key));
   viewer.open = true;
-  state.anchor = id;
+  state.anchor = key;
   // Zoomed-in views start fresh; a smaller-than-fit size is kept from last time.
   Object.assign(zoom, { z: Math.min(1, prefs.get("viewerScale", 1)), nx: 0, ny: 0 });
   renderViewer(true);
@@ -393,17 +530,16 @@ function go(delta: number) {
   const i = viewer.index + delta;
   if (i < 0 || i >= viewer.list.length) return;
   viewer.index = i;
-  state.anchor = viewer.list[i].id;
+  state.anchor = viewer.list[i].key;
   renderViewer(true);
 }
 
-/** After an edit: refresh the photo list from the updated disc and redraw in place. */
-function viewerDiscUpdated(d: Disc) {
-  updateDisc(d);
-  const id = viewer.list[viewer.index]?.id;
-  viewer.disc = d;
-  viewer.list = visiblePhotos(d);
-  viewer.index = Math.max(0, viewer.list.findIndex((p) => p.id === id));
+/** After an edit: refresh the photo list from the updated discs and redraw in place. */
+function viewerDiscsUpdated(discs: Disc[]) {
+  applyDiscs(discs);
+  const key = viewerItem()?.key;
+  viewer.list = viewer.source();
+  viewer.index = Math.max(0, viewer.list.findIndex((it) => it.key === key));
   renderViewer(false);
 }
 
@@ -423,9 +559,9 @@ function renderViewer(navigated: boolean) {
   stopAudio();
   viewer.stage?.destroy();
   viewer.stage = null;
-  const p = viewer.list[viewer.index];
-  const d = viewer.disc!;
-  if (!p) return closeViewer();
+  const it = viewerItem();
+  if (!it) return closeViewer();
+  const { photo: p, disc: d } = it;
   const taken = effectiveTaken(p);
   const takenHtml = taken
     ? `${esc(taken)}${p.edits.taken ? ` <span class="tag">edited</span>` : ""}`
@@ -473,6 +609,7 @@ function renderViewer(navigated: boolean) {
           ${fact("Shutter", p.info.shutter ? `${esc(p.info.shutter)} s` : "—")}
           ${fact("Flash", p.info.flash == null ? "—" : p.info.flash ? `${icon.flash(13)} fired` : "off")}
           ${fact("File", `${esc(p.stem)}.PMP · ${fmtBytes(p.fileBytes)}`)}
+          ${p.importedAt ? fact("Imported", esc(new Date(p.importedAt).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }))) : ""}
           ${p.protected ? fact("Protected", "yes") : ""}
           ${!p.inIndex ? fact("Index", `<span class="warn-text">not in the album index — the camera won't show it</span>`) : ""}
         </dl>
@@ -515,7 +652,7 @@ function renderViewer(navigated: boolean) {
   if (img && p.jpegPath && hasLook(p.edits)) {
     // Edited: show the rendered photo (rotation already applied) once it's ready.
     renderedUrl(p).then((u) => {
-      if (viewer.list[viewer.index]?.id !== p.id || !document.body.contains(img)) return;
+      if (viewerItem()?.key !== it.key || !document.body.contains(img)) return;
       img.onload = () => {
         viewer.stage?.destroy();
         viewer.stage = new ZoomStage($("#v-stage"), img, img.naturalWidth, img.naturalHeight, 0, zoom, zoomLabel);
@@ -534,12 +671,9 @@ function renderViewer(navigated: boolean) {
     const v = cap.value.trim();
     if (v === (p.edits.caption ?? "")) return;
     try {
-      const nd = await api.editPhotos(d.path, [{ photoId: p.id, setCaption: v }]);
-      updateDisc(nd);
-      viewer.disc = nd;
-      const id = p.id;
-      viewer.list = visiblePhotos(nd);
-      viewer.index = Math.max(0, viewer.list.findIndex((x) => x.id === id));
+      applyDiscs([await api.editPhotos(d.path, [{ photoId: p.id, setCaption: v }])]);
+      viewer.list = viewer.source();
+      viewer.index = Math.max(0, viewer.list.findIndex((x) => x.key === it.key));
     } catch (e) {
       toast(`Couldn't save the caption: ${e}`, undefined, "error");
     }
@@ -599,7 +733,7 @@ function paintWave(canvas: HTMLCanvasElement, peaks: Float32Array, progress: num
 }
 
 function togglePlay() {
-  const p = viewer.list[viewer.index];
+  const p = viewerItem()?.photo;
   if (!p?.wavPath) return;
   const btn = document.querySelector<HTMLButtonElement>('[data-v="play"]');
   if (viewer.audio && !viewer.audio.paused) {
@@ -640,8 +774,8 @@ function togglePlay() {
 }
 
 function openEditor() {
-  const p = viewer.list[viewer.index];
-  if (!p?.jpegPath || !viewer.disc || viewer.editor) return;
+  const it = viewerItem();
+  if (!it?.photo.jpegPath || viewer.editor) return;
   stopAudio();
   viewer.stage?.destroy();
   viewer.stage = null;
@@ -649,31 +783,24 @@ function openEditor() {
   viewer.editor = new PhotoEditor({
     stage: $("#v-stage"),
     panel: $(".v-info"),
-    disc: viewer.disc,
-    photo: p,
+    disc: it.disc,
+    photo: it.photo,
     done: (nd) => {
       viewer.editor = null;
       $("#viewer").classList.remove("editing");
-      if (nd) viewerDiscUpdated(nd);
+      if (nd) viewerDiscsUpdated([nd]);
       else renderViewer(false);
     },
   });
 }
 
-async function setFavorite(d: Disc, ids: string[], on: boolean) {
+async function edit(items: Item[], patch: Parameters<typeof saveEdits>[1], what: string) {
   try {
-    return await api.editPhotos(d.path, ids.map((photoId) => ({ photoId, setFavorite: on })));
+    const discs = await saveEdits(items, patch);
+    applyDiscs(discs);
+    return discs;
   } catch (e) {
-    toast(`Couldn't save: ${e}`, undefined, "error");
-    return null;
-  }
-}
-
-async function rotate(d: Disc, ids: string[], by: number) {
-  try {
-    return await api.editPhotos(d.path, ids.map((photoId) => ({ photoId, rotateBy: by })));
-  } catch (e) {
-    toast(`Couldn't rotate: ${e}`, undefined, "error");
+    toast(`Couldn't ${what}: ${e}`, undefined, "error");
     return null;
   }
 }
@@ -696,6 +823,14 @@ async function refreshPorts() {
   }
 }
 
+function resetCamera() {
+  state.camera = null;
+  state.imp = null;
+  Object.assign(state.cam, { contents: null, browsing: false, done: 0, total: 0, error: null, anchor: null });
+  state.cam.selection.clear();
+  state.cam.stored.clear();
+}
+
 async function connect() {
   if (!state.port) return;
   state.connecting = true;
@@ -703,36 +838,68 @@ async function connect() {
   state.connectLog = [];
   render();
   try {
-    state.camera = await api.connect(state.port);
-    state.importName = "";
-    state.imp = null;
-    state.importMode = "update";
+    const info = await api.connect(state.port);
+    resetCamera();
+    state.camera = info;
   } catch (e) {
     state.connectError = String(e);
   } finally {
     state.connecting = false;
     render();
   }
+  if (state.camera) browse(false);
 }
 
-async function runImport() {
-  const cam = state.camera;
-  if (!cam) return;
-  const into = cam.matchingDisc && state.importMode === "update" ? cam.matchingDisc : null;
-  const nameInput = document.getElementById("import-name") as HTMLInputElement | null;
-  const name = into ? state.discs.find((d) => d.path === into)?.name ?? "" : (nameInput?.value.trim() || `Disc ${state.discs.length + 1}`);
-  state.imp = { running: true, label: "Reading the disc's folders…", file: "", fileIndex: 0, fileCount: 0, done: 0, total: 0, rate: 0, log: [], error: null, result: null };
+async function browse(refresh: boolean) {
+  const cs = state.cam;
+  Object.assign(cs, { browsing: true, done: 0, total: 0, error: null });
   render();
   try {
-    const disc = await api.importDisc(name, into);
-    state.imp.result = disc;
-    state.imp.label = "All files copied and converted.";
-    await refreshDiscs();
+    cs.contents = await api.browseCamera(refresh);
+    const ids = new Set(cs.contents.photos.map((p) => p.id));
+    [...cs.selection].forEach((id) => { if (!ids.has(id)) cs.selection.delete(id); });
   } catch (e) {
-    state.imp.error = String(e);
+    cs.error = `Couldn't read the photo list: ${e}`;
   } finally {
-    state.imp.running = false;
-    try { state.camera = (await api.cameraStatus()) ?? null; } catch { /* keep the old info */ }
+    cs.browsing = false;
+    render();
+  }
+}
+
+function onBrowseEvent(ev: BrowseEvent) {
+  if (ev.kind !== "reading") return;
+  Object.assign(state.cam, { done: ev.done, total: ev.total });
+  const bar = document.querySelector<HTMLElement>("#browse-progress i");
+  if (bar) bar.style.width = `${Math.min(100, (ev.done / Math.max(1, ev.total)) * 100).toFixed(1)}%`;
+  const meta = document.getElementById("browse-meta");
+  if (meta) meta.textContent = `${fmtBytes(ev.done)} of ${fmtBytes(ev.total)}`;
+}
+
+/** Copy photos into the library: `paths` of chosen photos, or null for a whole-disc backup. */
+async function download(paths: string[] | null) {
+  state.imp = { running: true, label: "Starting…", done: 0, total: 0, rate: 0, log: [], error: null, count: paths?.length ?? null };
+  state.cam.stored.clear();
+  render();
+  try {
+    const disc = await api.downloadPhotos(paths);
+    applyDiscs([disc]);
+    await refreshDiscs();
+    state.cam.selection.clear();
+    state.imp = null;
+    toast(paths ? `Downloaded ${plural(paths.length, "photo")}.` : "The whole disc is backed up.", {
+      label: "Show",
+      run: () => { state.view = { kind: "library" }; state.selection.clear(); render(); },
+    });
+  } catch (e) {
+    if (state.imp) state.imp.error = String(e);
+    await refreshDiscs();
+  } finally {
+    if (state.imp) state.imp.running = false;
+    try {
+      if (state.cam.contents) state.cam.contents = await api.browseCamera(false);
+    } catch { /* keep the old view */ }
+    state.cam.stored.clear();
+    try { state.camera = (await api.cameraStatus()) ?? state.camera; } catch { /* keep the old info */ }
     render();
   }
 }
@@ -743,17 +910,22 @@ function onImportEvent(ev: ImportEvent) {
   switch (ev.kind) {
     case "listing":
       imp.total = ev.bytes_to_copy;
-      imp.log.push(`${plural(ev.files, "file")} on the disc (${fmtBytes(ev.bytes)}); ${ev.to_copy} to copy, ${ev.files - ev.to_copy} already in the library.`);
+      if (ev.to_copy === 0) imp.label = "Nothing new to copy.";
       break;
-    case "file":
-      imp.fileIndex = ev.index;
-      imp.fileCount = ev.count;
-      imp.file = ev.path;
-      imp.label = `File ${ev.index} of ${ev.count}: ${ev.path.split("/").pop()}`;
+    case "file": {
+      const name = ev.path.split("/").pop() ?? "";
+      imp.label = name.startsWith("PSN") ? `Photo ${ev.index} of ${ev.count}: ${name}` : name.startsWith("NRA") ? `Sound: ${name}` : `Index: ${name}`;
       break;
+    }
     case "progress":
       imp.done = ev.done_bytes;
       imp.rate = ev.rate;
+      break;
+    case "stored":
+      if (/\/PSN\d+\.PMP$/.test(ev.path)) {
+        state.cam.stored.add(ev.path);
+        document.querySelector(`[data-cam-path="${CSS.escape(ev.path)}"]`)?.classList.add("in-lib", "just");
+      }
       break;
     case "retry":
       imp.log.push(`Retrying ${ev.path}: ${ev.error}`);
@@ -762,22 +934,18 @@ function onImportEvent(ev: ImportEvent) {
       imp.label = "Converting photos and sound…";
       imp.done = imp.total;
       break;
-    case "done":
-      imp.log.push(`Copied ${ev.copied}, skipped ${ev.skipped}${ev.failed.length ? `, failed: ${ev.failed.join(", ")}` : ""}.`);
-      break;
   }
   updateImportProgress();
 }
 
-async function exportPhotos(d: Disc, ids: string[]) {
-  const photos = d.albums.flatMap((a) => a.photos).filter((p) => ids.includes(p.id));
-  const choice = await openExportSheet(photos);
+async function exportItems(items: Item[]) {
+  const choice = await openExportSheet(items.map((it) => it.photo));
   if (!choice) return;
   const dest = await open({ directory: true, title: "Export photos to…" });
   if (!dest || Array.isArray(dest)) return;
-  toast(`Exporting ${plural(ids.length, "photo")}…`);
+  toast(`Exporting ${plural(items.length, "photo")}…`);
   try {
-    const r = await api.exportPhotos(ids.map((photoId) => ({ discPath: d.path, photoId })), dest, choice);
+    const r = await api.exportPhotos(items.map((it) => ({ discPath: it.disc.path, photoId: it.photo.id })), dest, choice);
     toast(
       r.written ? `Exported ${plural(r.written, "file")}${r.alreadyThere ? ` (${r.alreadyThere} already there)` : ""}.` : "Everything was already exported there.",
       { label: "Show", run: () => revealItemInDir(dest) },
@@ -789,25 +957,56 @@ async function exportPhotos(d: Disc, ids: string[]) {
 
 // ---------------------------------------------------------------- render + events
 
+/** Which page is showing, so a redraw of the same page keeps its scroll position. */
+let shownPage = "";
+
+function keepScroll(page: string, draw: () => void) {
+  const top = shownPage === page ? document.querySelector(".page")?.scrollTop ?? 0 : 0;
+  draw();
+  shownPage = page;
+  const el = document.querySelector(".page");
+  if (el && top) el.scrollTop = top;
+}
+
 function render() {
   renderSidebar();
-  const d = currentDisc();
-  if (state.view.kind === "disc" && d) renderDisc(d);
-  else {
-    state.view = { kind: "camera" };
-    renderCamera();
-  }
+  if (state.view.kind === "camera") return renderCamera();
+  if (state.view.kind === "disc" && !currentDisc()) state.view = { kind: "library" };
+  renderGrid();
 }
+
+/** Click, shift-click (range) and ⌘/Ctrl-click (toggle) selection over an ordered list of ids. */
+function pick(set: Set<string>, ids: string[], anchor: string | null, id: string, e: MouseEvent, toggle: boolean): string {
+  if (e.shiftKey) {
+    const a = ids.indexOf(anchor ?? id);
+    const b = ids.indexOf(id);
+    const [lo, hi] = a < 0 ? [b, b] : [Math.min(a, b), Math.max(a, b)];
+    ids.slice(lo, hi + 1).forEach((x) => set.add(x));
+    document.getSelection()?.removeAllRanges();
+    return anchor ?? id;
+  }
+  if (toggle) set.has(id) ? set.delete(id) : set.add(id);
+  return id;
+}
+
+document.addEventListener("dblclick", (e) => {
+  const t = (e.target as HTMLElement).closest<HTMLElement>("[data-cam]");
+  if (!t || !t.classList.contains("in-lib")) return;
+  const i = state.cam.contents?.photos.findIndex((p) => p.id === t.dataset.cam) ?? -1;
+  const m = i >= 0 ? state.cam.contents!.inLibrary[i] : null;
+  if (!m) return;
+  state.cam.selection.delete(t.dataset.cam!);
+  openViewer(`${m.discPath}::${m.photoId}`, cameraLibraryItems);
+});
 
 document.addEventListener("click", async (e) => {
   const t = e.target as HTMLElement;
-  const el = t.closest<HTMLElement>("[data-action],[data-nav],[data-disc],[data-filter],[data-select],[data-photo],[data-open-disc],[data-v]");
+  const el = t.closest<HTMLElement>("[data-action],[data-nav],[data-disc],[data-filter],[data-select],[data-photo],[data-cam],[data-v]");
   if (!el) return;
-  const d = currentDisc();
+  const me = e as MouseEvent;
 
   if (el.dataset.v) {
-    const p = viewer.list[viewer.index];
-    const vd = viewer.disc;
+    const it = viewerItem();
     switch (el.dataset.v) {
       case "close": closeViewer(); break;
       case "prev": go(-1); break;
@@ -816,67 +1015,83 @@ document.addEventListener("click", async (e) => {
       case "zoom-reset": viewer.stage?.reset(); break;
       case "edit": openEditor(); break;
       case "favorite": {
-        if (!vd || !p) break;
-        const nd = await setFavorite(vd, [p.id], !p.edits.favorite);
-        if (nd) viewerDiscUpdated(nd);
+        if (!it) break;
+        const nd = await edit([it], () => ({ setFavorite: !it.photo.edits.favorite }), "save");
+        if (nd) viewerDiscsUpdated(nd);
         break;
       }
-      case "export": if (vd && p) exportPhotos(vd, [p.id]); break;
-      case "reveal": if (p) revealItemInDir(p.jpegPath ?? p.pmpPath); break;
-      case "edit-location": if (vd && p) openLocationEditor(vd, [p], viewerDiscUpdated); break;
-      case "edit-date": if (vd && p) openDateEditor(vd, [p], viewerDiscUpdated); break;
-      case "open-map": e.preventDefault(); if (p?.edits.location) openUrl(googleMapsUrl(p.edits.location)); break;
+      case "export": if (it) exportItems([it]); break;
+      case "reveal": if (it) revealItemInDir(it.photo.jpegPath ?? it.photo.pmpPath); break;
+      case "edit-location": if (it) openLocationEditor([it], viewerDiscsUpdated); break;
+      case "edit-date": if (it) openDateEditor([it], viewerDiscsUpdated); break;
+      case "open-map": e.preventDefault(); if (it?.photo.edits.location) openUrl(googleMapsUrl(it.photo.edits.location)); break;
       case "rotate-left":
       case "rotate-right": {
-        if (!vd || !p) break;
-        const nd = await rotate(vd, [p.id], el.dataset.v === "rotate-left" ? -90 : 90);
-        if (nd) viewerDiscUpdated(nd);
+        if (!it) break;
+        const nd = await edit([it], () => ({ rotateBy: el.dataset.v === "rotate-left" ? -90 : 90 }), "rotate");
+        if (nd) viewerDiscsUpdated(nd);
         break;
       }
     }
     return;
   }
-  if (el.dataset.nav === "camera") { state.view = { kind: "camera" }; state.selection.clear(); render(); return; }
+  if (el.dataset.nav) {
+    state.view = el.dataset.nav === "camera" ? { kind: "camera" } : { kind: "library" };
+    state.selection.clear();
+    state.anchor = null;
+    render();
+    return;
+  }
   if (el.dataset.disc) { state.view = { kind: "disc", path: el.dataset.disc }; state.selection.clear(); state.anchor = null; state.filter = "all"; render(); return; }
-  if (el.dataset.openDisc) { state.view = { kind: "disc", path: el.dataset.openDisc }; render(); return; }
   if (el.dataset.filter) { state.filter = el.dataset.filter as Filter; render(); return; }
-  const me = e as MouseEvent;
-  const pickId = el.dataset.select ?? el.dataset.photo;
-  if (pickId && d) {
+
+  // Camera tiles: clicking chooses photos to download.
+  if (el.dataset.cam && !state.imp?.running) {
+    const cs = state.cam;
+    const ids = cs.contents?.photos.map((p) => p.id) ?? [];
+    cs.anchor = pick(cs.selection, ids, cs.anchor, el.dataset.cam, me, true);
+    renderCamera();
+    return;
+  }
+
+  const pickKey = el.dataset.select ?? el.dataset.photo;
+  if (pickKey) {
     e.stopPropagation();
-    const list = visiblePhotos(d).map((p) => p.id);
-    if (me.shiftKey) {
-      // Range from the last photo clicked (or opened) to this one, added to the selection.
-      const a = list.indexOf(state.anchor ?? pickId);
-      const b = list.indexOf(pickId);
-      const [lo, hi] = a < 0 ? [b, b] : [Math.min(a, b), Math.max(a, b)];
-      list.slice(lo, hi + 1).forEach((id) => state.selection.add(id));
-      document.getSelection()?.removeAllRanges();
-    } else if (el.dataset.select || me.metaKey || me.ctrlKey || state.selection.size) {
-      state.selection.has(pickId) ? state.selection.delete(pickId) : state.selection.add(pickId);
-      state.anchor = pickId;
-    } else {
-      openViewer(d, pickId);
+    if (!me.shiftKey && !el.dataset.select && !me.metaKey && !me.ctrlKey && !state.selection.size) {
+      openViewer(pickKey);
       return;
     }
-    state.anchor = me.shiftKey ? state.anchor ?? pickId : pickId;
+    state.anchor = pick(state.selection, visibleItems().map((it) => it.key), state.anchor, pickKey, me, true);
     render();
     return;
   }
 
+  const d = currentDisc();
+  const scope = () => (d ? discItems(d) : allItems());
   switch (el.dataset.action) {
     case "connect": await connect(); break;
     case "disconnect":
       await api.disconnect();
-      state.camera = null;
-      state.imp = null;
+      resetCamera();
       render();
       break;
     case "refresh-ports": await refreshPorts(); render(); break;
     case "toggle-manual": state.manualPort = !state.manualPort; if (!state.manualPort) await refreshPorts(); render(); break;
-    case "import": await runImport(); break;
+    case "browse": browse(false); break;
+    case "browse-refresh": browse(true); break;
+    case "cam-select-new": cameraRows().filter((r) => !r.inLib).forEach((r) => state.cam.selection.add(r.p.id)); renderCamera(); break;
+    case "cam-select-all": cameraRows().forEach((r) => state.cam.selection.add(r.p.id)); renderCamera(); break;
+    case "cam-clear": state.cam.selection.clear(); renderCamera(); break;
+    case "download": {
+      const rows = cameraRows();
+      const chosen = rows.filter((r) => state.cam.selection.has(r.p.id));
+      const list = (chosen.length ? chosen : rows.filter((r) => !r.inLib)).map((r) => r.p.path);
+      if (list.length) await download(list);
+      break;
+    }
+    case "backup-disc": await download(null); break;
     case "cancel-import": await api.cancelImport(); break;
-    case "import-again": state.imp = null; state.importName = ""; render(); break;
+    case "import-done": state.imp = null; render(); break;
     case "add-folder": {
       const dir = await open({ directory: true, title: "Choose a disc backup folder (contains disc/ or raw/)" });
       if (!dir || Array.isArray(dir)) break;
@@ -891,7 +1106,7 @@ document.addEventListener("click", async (e) => {
       break;
     }
     case "change-library": {
-      const dir = await open({ directory: true, title: "Choose where imported discs are stored" });
+      const dir = await open({ directory: true, title: "Choose where downloaded photos are stored" });
       if (!dir || Array.isArray(dir)) break;
       await api.setLibraryDir(dir);
       state.settings = await api.settings();
@@ -902,44 +1117,34 @@ document.addEventListener("click", async (e) => {
     case "reveal-library": if (state.settings) revealItemInDir(state.settings.libraryDir); break;
     case "reveal-disc": if (d) revealItemInDir(d.path); break;
     case "rename": state.renaming = true; render(); break;
-    case "export": if (d) exportPhotos(d, state.selection.size ? [...state.selection] : d.albums.flatMap((a) => a.photos.map((p) => p.id))); break;
+    case "export": exportItems(state.selection.size ? selectedItems() : scope()); break;
     case "clear-selection": state.selection.clear(); render(); break;
-    case "sel-location": if (d) openLocationEditor(d, selectedPhotos(d), (nd) => { updateDisc(nd); render(); }); break;
-    case "sel-date": if (d) openDateEditor(d, selectedPhotos(d), (nd) => { updateDisc(nd); render(); }); break;
+    case "sel-location": openLocationEditor(selectedItems(), (nd) => { applyDiscs(nd); render(); }); break;
+    case "sel-date": openDateEditor(selectedItems(), (nd) => { applyDiscs(nd); render(); }); break;
     case "sel-favorite": {
-      if (!d) break;
-      const chosen = selectedPhotos(d);
-      const nd = await setFavorite(d, chosen.map((p) => p.id), !chosen.every((p) => p.edits.favorite));
-      if (nd) { updateDisc(nd); render(); }
+      const chosen = selectedItems();
+      const on = !chosen.every((it) => it.photo.edits.favorite);
+      if (await edit(chosen, () => ({ setFavorite: on }), "save")) render();
       break;
     }
     case "sel-auto": {
-      if (!d) break;
-      toast(`Auto-enhancing ${plural(state.selection.size, "photo")}…`);
-      try {
-        const nd = await api.editPhotos(d.path, [...state.selection].map((photoId) => ({ photoId, autoEnhance: true })));
-        updateDisc(nd);
+      const n = state.selection.size;
+      toast(`Auto-enhancing ${plural(n, "photo")}…`);
+      if (await edit(selectedItems(), () => ({ autoEnhance: true }), "auto-enhance")) {
         render();
-        toast(`Auto-enhanced ${plural(state.selection.size, "photo")}. Open one and press Edit to fine-tune or turn it off.`);
-      } catch (e) {
-        toast(`Auto-enhance failed: ${e}`, undefined, "error");
+        toast(`Auto-enhanced ${plural(n, "photo")}. Open one and press Edit to fine-tune or turn it off.`);
       }
       break;
     }
     case "sel-rotate-left":
     case "sel-rotate-right": {
-      if (!d) break;
-      const nd = await rotate(d, [...state.selection], el.dataset.action === "sel-rotate-left" ? -90 : 90);
-      if (nd) { updateDisc(nd); render(); }
+      const by = el.dataset.action === "sel-rotate-left" ? -90 : 90;
+      if (await edit(selectedItems(), () => ({ rotateBy: by }), "rotate")) render();
       break;
     }
-    case "select-all": if (d) { visiblePhotos(d).forEach((p) => state.selection.add(p.id)); render(); } break;
+    case "select-all": visibleItems().forEach((it) => state.selection.add(it.key)); render(); break;
   }
 });
-
-function selectedPhotos(d: Disc): Photo[] {
-  return d.albums.flatMap((a) => a.photos).filter((p) => state.selection.has(p.id));
-}
 
 document.addEventListener("change", (e) => {
   const t = e.target as HTMLInputElement;
@@ -954,7 +1159,6 @@ document.addEventListener("change", (e) => {
     if (viewer.audio) viewer.audio.loop = t.checked;
   }
   if (t.id === "port-select") state.port = t.value;
-  if (t.name === "imode") { state.importMode = t.value as "update" | "new"; render(); }
 });
 
 document.addEventListener("input", (e) => {
@@ -964,22 +1168,28 @@ document.addEventListener("input", (e) => {
     const btn = document.querySelector<HTMLButtonElement>('[data-action="connect"]');
     if (btn) btn.disabled = !state.port || state.connecting;
   }
-  if (t.id === "import-name") state.importName = t.value;
 });
 
 document.addEventListener("keydown", (e) => {
   if (document.querySelector(".modal-back")) return; // a sheet is open; it handles its own keys
   const typing = (e.target as HTMLElement).matches?.("input, textarea, select");
   if (!viewer.open) {
-    if (e.key === "Enter" && (e.target as HTMLElement).classList?.contains("tile")) {
-      const d = currentDisc();
-      const id = (e.target as HTMLElement).dataset.photo;
-      if (d && id) openViewer(d, id);
+    if (typing) return;
+    const target = e.target as HTMLElement;
+    if (e.key === "Enter" && target.classList?.contains("tile") && target.dataset.photo) openViewer(target.dataset.photo);
+    if (state.view.kind === "camera") {
+      if (e.key === "Escape" && state.cam.selection.size) { state.cam.selection.clear(); renderCamera(); }
+      if ((e.metaKey || e.ctrlKey) && e.key === "a" && state.cam.contents) {
+        e.preventDefault();
+        state.cam.contents.photos.forEach((p) => state.cam.selection.add(p.id));
+        renderCamera();
+      }
+      return;
     }
     if (e.key === "Escape" && state.selection.size) { state.selection.clear(); render(); }
-    if ((e.metaKey || e.ctrlKey) && e.key === "a" && !typing && currentDisc()) {
+    if ((e.metaKey || e.ctrlKey) && e.key === "a") {
       e.preventDefault();
-      visiblePhotos(currentDisc()!).forEach((p) => state.selection.add(p.id));
+      visibleItems().forEach((it) => state.selection.add(it.key));
       render();
     }
     return;
@@ -1018,15 +1228,18 @@ document.addEventListener("mousedown", (e) => {
 
 // Keep the camera awake and the status fresh; notice when it is switched off.
 setInterval(async () => {
-  if (!state.camera || state.imp?.running) return;
+  if (!state.camera || state.imp?.running || state.cam.browsing) return;
   try {
     const info = await api.cameraStatus();
     state.camera = info;
-    if (state.view.kind === "camera" && !document.querySelector("input:focus")) render();
-    else renderSidebar();
+    if (!info) resetCamera();
+    renderSidebar();
+    const strip = document.querySelector(".camstrip");
+    if (strip && info) strip.outerHTML = camStrip(info);
+    else if (!info && state.view.kind === "camera") render();
   } catch (e) {
     if (String(e) === "busy") return;
-    state.camera = null;
+    resetCamera();
     toast(String(e), undefined, "error");
     render();
   }
@@ -1038,12 +1251,13 @@ async function init() {
     state.connectLog.push(e.payload);
     const log = document.querySelector(".log");
     if (log) log.textContent = state.connectLog.join("\n");
-    else renderCamera();
+    else if (state.view.kind === "camera") renderCamera();
   });
   await listen<ImportEvent>("import-event", (e) => onImportEvent(e.payload));
+  await listen<BrowseEvent>("browse-event", (e) => onBrowseEvent(e.payload));
   state.settings = await api.settings();
   await Promise.all([refreshDiscs(), refreshPorts()]);
-  if (state.discs.length) state.view = { kind: "disc", path: state.discs[0].path };
+  state.view = state.discs.length ? { kind: "library" } : { kind: "camera" };
   render();
   if (await invoke<boolean>("diag_enabled")) runDiag();
 }
@@ -1051,7 +1265,7 @@ async function init() {
 async function runDiag() {
   const out: string[] = [];
   const say = (s: string) => out.push(s);
-  const p = state.discs.flatMap((d) => d.albums.flatMap((a) => a.photos)).find((x) => x.jpegPath);
+  const p = allItems().map((it) => it.photo).find((x) => x.jpegPath);
   if (!p) return invoke("diag_report", { text: "no photo" });
   try {
     const r: any = await invoke("read_disc_file", { path: p.jpegPath });
@@ -1067,6 +1281,18 @@ async function runDiag() {
     const f = await fetch(fileUrl(p.jpegPath!));
     say(`fetch asset -> ${f.status} ${(await f.arrayBuffer()).byteLength}`);
   } catch (e) { say(`fetch asset error ${e}`); }
+  const port = await invoke<string | null>("diag_port");
+  if (port) {
+    try {
+      await api.connect(port);
+      const c = await api.browseCamera(true);
+      say(`browse -> ${c.photos.length} photos, ${c.inLibrary.filter(Boolean).length} in library, thumbs ${c.photos.filter((x) => x.thumb?.startsWith("data:image/jpeg")).length}`);
+      const img = new Image();
+      await new Promise((ok, bad) => { img.onload = ok; img.onerror = bad; img.src = c.photos[0].thumb!; });
+      say(`thumb decodes ${img.naturalWidth}x${img.naturalHeight}`);
+      await api.disconnect();
+    } catch (e) { say(`browse error ${e}`); }
+  }
   await invoke("diag_report", { text: out.join(" | ") });
 }
 

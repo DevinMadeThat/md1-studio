@@ -8,6 +8,7 @@
 //! picture) and a few others are refused unconditionally.
 
 pub mod adjust;
+pub mod browse;
 pub mod camera;
 pub mod dostime;
 pub mod edits;

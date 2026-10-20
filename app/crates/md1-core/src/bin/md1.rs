@@ -3,7 +3,10 @@
 //!   md1 ports
 //!   md1 probe   PORT
 //!   md1 ls      PORT [FOLDER...]
-//!   md1 import  PORT DISC_DIR [NAME]
+//!   md1 import  PORT DISC_DIR [NAME]          (the whole disc)
+//!   md1 browse  PORT [CACHE_DIR] [DISC_DIR...] (photos on the camera, from thumbnails; with
+//!                                               DISC_DIRs, which ones each library folder has)
+//!   md1 get     PORT DISC_DIR PSN_PATH...      (chosen photos + their sound + index files)
 //!   md1 scan    DISC_DIR            (JSON of albums and photos)
 //!   md1 wav     FILE.PMA OUT.wav
 //!   md1 export  DISC_DIR OUT_DIR [SCALE]
@@ -12,7 +15,7 @@
 use std::path::Path;
 use std::process::ExitCode;
 
-use md1_core::{camera, export, formats, import, library, transport, Error};
+use md1_core::{browse, camera, export, formats, import, library, transport, Error};
 
 fn trace() -> Option<Box<dyn std::io::Write + Send>> {
     let path = std::env::var("MD1_TRACE").ok()?;
@@ -48,11 +51,29 @@ fn run(args: &[String]) -> Result<(), Error> {
                 }
             }
         }
-        "import" => {
+        "browse" => {
             let mut cam = connect(arg(2)?)?;
-            let opts = import::ImportOptions { disc_dir: arg(3)?.into(), name: args.get(4).cloned().unwrap_or_default() };
+            let d = browse::browse(&mut cam, args.get(3).map(Path::new), &mut |ev| {
+                eprintln!("{ev:?}");
+                Ok(())
+            })?;
+            if args.len() > 4 {
+                let discs: Vec<library::Disc> = args[4..].iter().filter_map(|p| library::scan_disc(Path::new(p))).collect();
+                for (p, m) in d.photos.iter().zip(library::match_camera(&discs, &d)) {
+                    println!("{}\t{}", p.id, m.map(|m| format!("{} {}", m.disc_path, m.photo_id)).unwrap_or("-".into()));
+                }
+            } else {
+                println!("{}", serde_json::to_string_pretty(&d).unwrap());
+            }
+            let _ = cam.disconnect();
+        }
+        "import" | "get" => {
+            let mut cam = connect(arg(2)?)?;
+            let only = (arg(1)? == "get").then(|| args[4..].iter().cloned().collect());
+            let name = if only.is_some() { String::new() } else { args.get(4).cloned().unwrap_or_default() };
+            let opts = import::ImportOptions { disc_dir: arg(3)?.into(), name, only };
             let mut last = String::new();
-            import::import_disc(&mut cam, &opts, &mut |ev| {
+            import::import_disc(&mut cam, &opts, None, &mut |ev| {
                 let line = match &ev {
                     import::ImportEvent::Progress { .. } => return Ok(()),
                     other => format!("{other:?}"),

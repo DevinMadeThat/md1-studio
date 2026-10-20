@@ -10,23 +10,25 @@ The camera was only ever sold in Japan. Its PC kit (software plus cable) is long
 software runs only on Windows 95 and classic Mac OS. This project works out how the camera talks
 over its serial port and provides:
 
-* **MD1 Studio**, a desktop app that copies a whole disc, shows the photos with their
-  sound, lets you add places, dates and captions, fix up the pictures, and exports ordinary
-  JPEGs and WAVs.
+* **MD1 Studio**, a desktop app that shows you what's on the camera, downloads the photos you
+  pick (with their sound) into one library, lets you add places, dates and captions and fix up
+  the pictures, and exports ordinary JPEGs and WAVs.
 * **Full documentation** of the serial protocol and the on-disc formats, including the
   hidden ATRAC sound files that Sony's own PC software never read.
 * **English cheat sheets** for the Japanese-only camera.
 
 <br clear="right">
 
-![MD1 Studio showing a disc of photos in a grid](docs/images/screenshot-grid.jpg)
+![MD1 Studio's library: all photos, grouped by the day they were imported](docs/images/screenshot-grid.jpg)
 
 <table>
 <tr>
+<td><img src="docs/images/screenshot-camera.jpg" alt="The camera's photos as thumbnails, with the ones already in the library marked"></td>
 <td><img src="docs/images/screenshot-viewer.jpg" alt="Viewer with caption, map location and sound player"></td>
 <td><img src="docs/images/screenshot-editor.jpg" alt="Photo editor with auto-enhance and colour sliders"></td>
 </tr>
 <tr>
+<td align="center"><sub>Camera: pick photos from the camera's thumbnails; ones you already have are marked</sub></td>
 <td align="center"><sub>Viewer: shot details, caption, place on a map, and the photo's sound</sub></td>
 <td align="center"><sub>Editor: auto-enhance, light and colour, noise cleanup, crop and straighten</sub></td>
 </tr>
@@ -39,16 +41,21 @@ over its serial port and provides:
 **Getting photos off the camera**
 * Finds the camera automatically and switches the link to its top speed (115,200 baud, about
   10 seconds a photo).
-* Copies **every file on the disc** byte for byte: photos, sound, thumbnails and the disc's
-  index files, so a disc can be restored later. When you import the same disc again, only new
-  photos are copied.
+* **Shows what's on the camera before downloading anything**, using the camera's own
+  thumbnails (a whole disc's worth in seconds). Photos already in your library are marked, even
+  if they came from another disc or a restored copy.
+* **Download just the new photos, or pick a few** (click, shift-click for a range). Their sound
+  comes with them.
+* Or **back up the whole disc** byte for byte (every file, including the index files), so it
+  can be restored later.
 * Decodes the camera's **sound recordings** (mono ATRAC1) to WAV.
 * **Read-only by design.** The app never writes to the disc, and it refuses to send the
   firmware's format and delete commands at all (see [Be careful with your disc](#be-careful-with-your-disc)).
 
 **Browsing**
-* A library of discs, each shown as a photo grid with badges for sound, place, caption and
-  FINE quality. Filter by favourites, sound or quality.
+* **One library** of every photo you've downloaded, grouped by the day you imported it, with
+  badges for sound, place, caption and FINE quality. Filter by favourites, sound or quality.
+  Each disc is also listed on its own.
 * A full-screen viewer with keyboard navigation and pinch/scroll zoom; the zoom level carries
   over from photo to photo, including zooming out to smaller than the window.
 * A sound player with a waveform, plus optional auto-play and loop.
@@ -154,9 +161,11 @@ you open the app.
 
 1. Connect the camera (set up as above) and open MD1 Studio. Under **Camera**, pick the port
    (the USB adapter is listed first) and click **Connect**.
-2. Click **Import**. The whole disc is copied into your library (`~/Pictures/MD1 Studio` by
-   default) and the photos appear as they arrive.
-3. Browse, add places and dates, edit, and **Export** JPEGs and WAVs wherever you like.
+2. The camera's photos appear as thumbnails, with the ones you already have marked
+   **In library**. Click **Download new** or pick the ones you want. They're copied into your
+   library (`~/Pictures/MD1 Studio` by default) with their sound.
+3. Under **All photos**, browse, add places and dates, edit, and **Export** JPEGs and WAVs
+   wherever you like.
 
 Already have a backup made with the Python tools? Use **Add backup folder…** in the sidebar.
 

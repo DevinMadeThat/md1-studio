@@ -42,10 +42,13 @@ Where to pick up next session (camera battery was low at the end of 2026-10-18).
 
 ## Desktop app (MD1 Studio, `app/`) — next
 
-v0.1 (built 2026-10-18) connects, imports, browses, plays sound and exports. Still to do:
+v0.1 (built 2026-10-18) connects, imports, browses, plays sound and exports. First real-camera
+connection: 2026-10-19 (worked). Since then: browse the camera through its thumbnails, download
+chosen photos, one library grouped by import day, matching of camera photos to the library.
 
-1. **First real-camera run**: connect, import disc 1 properly (fills in its sound, thumbnails and
-   times), re-import disc 2 (should copy only the added `PSN00019.PMP` + changed index files).
+1. **Real-camera run of the thumbnail browser**: browse disc 2 (restored, 20 photos; should show
+   19 as in the library through name/size/thumbnail matching even though the restore gave the
+   files new times), download `PSN00019`, then do disc 1.
 2. **Restore disc from backup** (port `md1tool/restore.py`): confirmation screen, battery check
    (status power ≥ 3), write-protect hint, verify every file, "power-cycle the camera" prompt.
 3. **Add photos to the camera** (port `add_photo.py`): camera-made PMPs first; arbitrary JPEGs
@@ -54,6 +57,26 @@ v0.1 (built 2026-10-18) connects, imports, browses, plays sound and exports. Sti
 5. Signing/notarization for macOS distribution; LGPL note for the ATRAC1 crate.
 6. Nice to have: set a real date for clock-less discs at export ("these were taken on …"),
    slideshow with sound, album covers from `OV_IDX.PMX`, show `PDF_MD` contents.
+
+### What Sony's Album Utility 1.5 did (from its help file) vs. MD1 Studio
+
+| Sony Album Utility | MD1 Studio |
+|---|---|
+| "Open Camera": camera image list with thumbnails; copy selected images to an album | Done (thumbnail browser, download chosen photos, "In library" marks) |
+| Export images as BMP / JPEG (quality 1–100) / TIFF | JPEG with EXIF/XMP, 1–3×; no TIFF/PNG yet |
+| Image info: **protect**, **caption** (14 chars) and edited date, **written back to the camera** (PIC_INF / PMP header rewrite) | Captions and dates stay in the library; no writing to the camera yet |
+| Rotate 90°/180° (stored in PIC_INF byte 5, so the camera shows it rotated) | Rotate in the library only |
+| **Copy To Camera**: send album images or any BMP/JPEG, fitted to 640 × 480, Fine or Snapshot quality | Not yet (hand-add proven in `md1tool/add_photo.py`) |
+| **Delete** pictures on the camera (`02 15`), skipping protected ones | Deliberately refused |
+| Albums in folders with titles; new / rename / delete; **set album cover** (`OV_IDX.PMX`) | One library grouped by import; no albums or covers yet |
+| Find images by recorded / edited date (on, before, after) | No search yet |
+| Print an image (fit / actual size) or a **contact sheet** (n per row) | Not yet |
+| Copy to clipboard (with a crop frame), paste from clipboard | Not yet |
+| Captions or dates under thumbnails | Badges only |
+| Slideshow (`SSHOW.EXE`) | Not yet (the camera's own slideshow plays sound; ours could too) |
+| Monitor colour/gamma calibration | Not needed today |
+| TWAIN source for other apps | Not planned |
+| Thumbnail cache keyed on the status "change serial" (status bytes 18–21; MD1 returns FF) | Cache keyed on file size + directory-entry times |
 
 Hard safety rules (already enforced in `md1-core/src/camera.rs`): never send `02 10`, `02 15`;
 writes only inside explicit user actions; cap path payloads (firmware hangs on ~138-byte paths);

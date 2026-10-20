@@ -51,10 +51,12 @@ impl DosTime {
 
 /// Current UTC time as ISO-8601, without pulling in a date crate.
 pub fn now_utc_iso() -> String {
-    let secs = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs_f64())
-        .unwrap_or(0.0);
+    iso_utc(std::time::SystemTime::now())
+}
+
+/// A system time as ISO-8601 UTC, e.g. "2026-10-19T23:40:58.009Z".
+pub fn iso_utc(t: std::time::SystemTime) -> String {
+    let secs = t.duration_since(std::time::UNIX_EPOCH).map(|d| d.as_secs_f64()).unwrap_or(0.0);
     let days = (secs / 86400.0).floor() as i64;
     let rem = secs - days as f64 * 86400.0;
     // Howard Hinnant's civil_from_days.

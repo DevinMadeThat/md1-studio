@@ -128,6 +128,10 @@ export interface Photo {
   inIndex: boolean;
   protected: boolean;
   edits: PhotoEdits;
+  /** UTC ISO-8601: when the photo was copied off the camera. */
+  importedAt: string | null;
+  /** The camera's own 80 × 60 thumbnail. */
+  thumbPath: string | null;
 }
 
 export interface Album {
@@ -147,7 +151,54 @@ export interface Disc {
   photoCount: number;
   soundCount: number;
   fineCount: number;
+  /** Photos on the disc that weren't downloaded. */
+  missingPhotos: number;
 }
+
+/** A photo in the library: which disc folder it lives in, and a key unique across the library. */
+export interface Item {
+  key: string;
+  disc: Disc;
+  photo: Photo;
+}
+
+export const itemKey = (disc: Disc, photo: Photo) => `${disc.path}::${photo.id}`;
+
+/** A photo on the disc in the camera, seen through its thumbnail (not downloaded). */
+export interface CameraPhoto {
+  id: string;
+  album: string;
+  number: number;
+  stem: string;
+  position: number;
+  path: string;
+  size: number;
+  created: string | null;
+  clockUnset: boolean;
+  soundPath: string | null;
+  soundSize: number | null;
+  soundSeconds: number | null;
+  protected: boolean;
+  inIndex: boolean;
+  quality: "FINE" | "STD";
+  /** data: URL */
+  thumb: string | null;
+}
+
+export interface LibraryMatch {
+  discPath: string;
+  photoId: string;
+}
+
+export interface CameraContents {
+  photos: CameraPhoto[];
+  inLibrary: (LibraryMatch | null)[];
+  discPath: string | null;
+}
+
+export type BrowseEvent =
+  | { kind: "listing"; files: number }
+  | { kind: "reading"; path: string; done: number; total: number };
 
 export interface Settings {
   libraryDir: string;
@@ -162,6 +213,7 @@ export type ImportEvent =
   | { kind: "file"; index: number; count: number; path: string; size: number }
   | { kind: "progress"; file_bytes: number; file_size: number; done_bytes: number; total_bytes: number; rate: number }
   | { kind: "retry"; path: string; error: string }
+  | { kind: "stored"; path: string }
   | { kind: "converting" }
   | { kind: "done"; copied: number; skipped: number; failed: string[] };
 
@@ -182,7 +234,9 @@ export const api = {
   connect: (port: string) => invoke<CameraInfo>("connect", { port }),
   disconnect: () => invoke<void>("disconnect"),
   cameraStatus: () => invoke<CameraInfo | null>("camera_status"),
-  importDisc: (name: string, into: string | null) => invoke<Disc>("import_disc", { name, into }),
+  browseCamera: (refresh: boolean) => invoke<CameraContents>("browse_camera", { refresh }),
+  /** `paths`: camera paths of the photos to copy; null = the whole disc. */
+  downloadPhotos: (paths: string[] | null) => invoke<Disc>("download_photos", { paths }),
   cancelImport: () => invoke<void>("cancel_import"),
   exportPhotos: (items: { discPath: string; photoId: string }[], dest: string, options: ExportOptions) =>
     invoke<ExportSummary>("export_photos", { items, dest, options }),

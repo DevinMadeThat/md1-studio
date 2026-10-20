@@ -1,4 +1,6 @@
-//! Copy every file on the disc, byte-exact, into a disc folder, then derive viewable files.
+//! Copy files from the disc, byte-exact, into a disc folder, then derive viewable files. Either
+//! the whole disc (a full backup) or chosen photos (with their sound) plus the small album index
+//! and thumbnail files.
 //!
 //! Disc folder layout (same as `md1tool/md1.py mirror`, so old backups open directly):
 //! ```text
@@ -7,12 +9,12 @@
 //! <disc>/jpeg/<album>_PSNnnnnn.jpg
 //! <disc>/audio/<album>_NRAnnnnn.wav
 //! <disc>/thumbnails/<album>_PIDXnnn/nnnn.jpg
-//! <disc>/disc.json           app metadata (name, camera, volume, import history)
+//! <disc>/disc.json           app metadata (name, camera, volume, import history, per-photo import times)
 //! <disc>/history/<time>/...  older copies of files that changed on the camera since last import
 //! ```
 //! Nothing in a disc folder is ever deleted by an import.
 
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
@@ -20,6 +22,7 @@ use std::time::Instant;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+use crate::browse::{is_index_file, CameraDisc};
 use crate::camera::{Camera, DirEntry, VolumeInfo};
 use crate::dostime::now_utc_iso;
 use crate::formats;
@@ -34,6 +37,8 @@ pub enum ImportEvent {
     File { index: usize, count: usize, path: String, size: u32 },
     Progress { file_bytes: usize, file_size: u32, done_bytes: u64, total_bytes: u64, rate: f64 },
     Retry { path: String, error: String },
+    /// A file was copied and saved.
+    Stored { path: String },
     Converting,
     Done { copied: usize, skipped: usize, failed: Vec<String> },
 }
@@ -51,6 +56,9 @@ pub struct DiscMeta {
     pub formatted: String,
     #[serde(default)]
     pub imports: Vec<String>,
+    /// When each photo ("<album>/<PSNnnnnn>") was first copied into this folder (UTC).
+    #[serde(default)]
+    pub photo_imports: BTreeMap<String, String>,
 }
 
 impl DiscMeta {
@@ -134,30 +142,54 @@ fn store(disc_dir: &Path, rel: &str, data: &[u8], stamp: &str) -> std::io::Resul
 pub struct ImportOptions {
     pub disc_dir: PathBuf,
     pub name: String,
+    /// Copy only these photos (camera paths of `PSN*.PMP` files) with their sound files, plus the
+    /// album index and thumbnail files. `None` copies the whole disc.
+    pub only: Option<HashSet<String>>,
 }
 
-/// Copy the whole disc. Photos and sound files never change on the camera, so ones already in
-/// the folder with the right size are skipped; index files are always re-read.
+/// The sound file recorded with a photo: `/…/PSN00018.PMP` → `/…/NRA00018.PMA`.
+pub fn sound_path_for(photo: &str) -> Option<String> {
+    let (dir, name) = photo.rsplit_once('/')?;
+    let n = name.strip_prefix("PSN")?.strip_suffix(".PMP")?;
+    Some(format!("{dir}/NRA{n}.PMA"))
+}
+
+/// Copy the disc (or the chosen photos). Photos and sound files never change on the camera, so
+/// ones already in the folder with the right size are skipped; index files are re-read, unless
+/// `browsed` (a [`crate::browse::browse`] of this disc in this session) already holds them.
 pub fn import_disc(
     cam: &mut Camera,
     opts: &ImportOptions,
+    browsed: Option<&CameraDisc>,
     on_event: &mut dyn FnMut(ImportEvent) -> Result<(), Error>,
 ) -> Result<DiscMeta, Error> {
     let disc_dir = &opts.disc_dir;
     fs::create_dir_all(disc_dir)?;
     let stamp = now_utc_iso().replace([':', '.'], "-");
 
-    let vol: Option<VolumeInfo> = cam.volume_info().ok();
+    let vol: Option<VolumeInfo> = match browsed {
+        Some(b) => b.volume.clone(),
+        None => cam.volume_info().ok(),
+    };
     if let Some(v) = &vol {
         on_event(ImportEvent::Volume { label: v.label.clone(), free_bytes: v.free_bytes, total_bytes: v.total_bytes })?;
     }
 
-    let tree = walk(cam)?;
+    let tree = match browsed {
+        Some(b) => b.tree.clone(),
+        None => walk(cam)?,
+    };
     let mut listing = String::new();
     for (p, e) in &tree {
         listing.push_str(&listing_line(p, e));
     }
-    let files: Vec<&(String, DirEntry)> = tree.iter().filter(|(_, e)| !e.is_dir).collect();
+    let wanted: Option<HashSet<String>> = opts.only.as_ref().map(|only| {
+        only.iter().flat_map(|p| [Some(p.clone()), sound_path_for(p)]).flatten().collect()
+    });
+    let files: Vec<&(String, DirEntry)> = tree
+        .iter()
+        .filter(|(p, e)| !e.is_dir && wanted.as_ref().is_none_or(|w| w.contains(p) || is_index_file(p)))
+        .collect();
     let immutable = |p: &str| {
         let n = p.rsplit('/').next().unwrap_or("");
         n.starts_with("PSN") || n.starts_with("NRA")
@@ -188,8 +220,16 @@ pub fn import_disc(
     let t0 = Instant::now();
     let mut done: u64 = 0;
     let mut failed = Vec::new();
+    let mut meta = DiscMeta::load(disc_dir).unwrap_or_default();
+    let now = now_utc_iso();
     for (i, (path, e)) in todo.iter().enumerate() {
         on_event(ImportEvent::File { index: i + 1, count: todo.len(), path: path.clone(), size: e.size })?;
+        if let Some(data) = browsed.and_then(|b| b.files.get(path)).filter(|d| d.len() == e.size as usize) {
+            store(disc_dir, path, data, &stamp)?;
+            done += e.size as u64;
+            on_event(ImportEvent::Stored { path: path.clone() })?;
+            continue;
+        }
         let mut result = Err(Error::Timeout);
         for attempt in 0..3 {
             let base = done;
@@ -217,6 +257,12 @@ pub fn import_disc(
             Ok(data) => {
                 store(disc_dir, path, &data, &stamp)?;
                 done += e.size as u64;
+                if let Some(id) = photo_id(path) {
+                    meta.photo_imports.entry(id).or_insert_with(|| now.clone());
+                    // Saved as we go, so a cancelled import still knows when its photos arrived.
+                    meta.save(disc_dir)?;
+                }
+                on_event(ImportEvent::Stored { path: path.clone() })?;
             }
             Err(_) => failed.push(path.clone()),
         }
@@ -229,7 +275,6 @@ pub fn import_disc(
     convert_disc(disc_dir)?;
     write_manifest(disc_dir)?;
 
-    let mut meta = DiscMeta::load(disc_dir).unwrap_or_default();
     if meta.name.is_empty() || !opts.name.is_empty() {
         meta.name = opts.name.clone();
     }
@@ -239,7 +284,7 @@ pub fn import_disc(
         meta.fingerprint = v.fingerprint();
         meta.formatted = v.created.iso();
     }
-    meta.imports.push(now_utc_iso());
+    meta.imports.push(now);
     meta.save(disc_dir)?;
 
     on_event(ImportEvent::Done {
@@ -252,6 +297,14 @@ pub fn import_disc(
     } else {
         Err(Error::Protocol(format!("{} file(s) could not be read: {}", failed.len(), failed.join(", "))))
     }
+}
+
+/// "/PIC_MD/PIC00001/PSN00018.PMP" → "PIC00001/PSN00018"
+fn photo_id(path: &str) -> Option<String> {
+    let rest = path.strip_prefix("/PIC_MD/")?;
+    let (album, name) = rest.split_once('/')?;
+    let stem = name.strip_suffix(".PMP").filter(|s| s.starts_with("PSN"))?;
+    Some(format!("{album}/{stem}"))
 }
 
 fn store_plain(disc_dir: &Path, name: &str, data: &[u8], stamp: &str) -> std::io::Result<()> {
@@ -357,4 +410,20 @@ pub fn convert_disc(disc_dir: &Path) -> Result<(usize, usize), Error> {
         }
     }
     Ok((photos, sounds))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn photo_paths() {
+        assert_eq!(sound_path_for("/PIC_MD/PIC00001/PSN00018.PMP").as_deref(), Some("/PIC_MD/PIC00001/NRA00018.PMA"));
+        assert_eq!(sound_path_for("/PIC_MD/PIC00001/PIC_INF.PMF"), None);
+        assert_eq!(photo_id("/PIC_MD/PIC00001/PSN00018.PMP").as_deref(), Some("PIC00001/PSN00018"));
+        assert_eq!(photo_id("/PIC_MD/PIC00001/NRA00018.PMA"), None);
+        assert!(is_index_file("/PIC_MD/PIC00001/PIDX000.PMX"));
+        assert!(is_index_file("/PIC_MD/OV_INF.PMF"));
+        assert!(!is_index_file("/PDF_MD/TOTAL.INF"));
+    }
 }
